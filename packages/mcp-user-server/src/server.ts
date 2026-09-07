@@ -3,9 +3,16 @@ import * as z from "zod/v4";
 import { createGramJsUserClient, qrUrl } from "./client.js";
 import {
   getUserApiCredentials,
+  readSessionString,
   sessionSource,
   writeSessionString,
 } from "./credentials.js";
+import {
+  clearPendingLogin,
+  readPendingLogin,
+  writePendingLogin,
+  type PendingPhone,
+} from "./pending-login.js";
 import { filterDialogs } from "./dialogs.js";
 import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
@@ -29,14 +36,8 @@ function errorResult(err: unknown) {
   };
 }
 
-type PendingPhone = {
-  phone: string;
-  phoneCodeHash: string;
-  isCodeViaApp: boolean;
-};
-
 export type UserServerOptions = {
-  createClient?: () => TelegramUserClient;
+  createClient?: (session?: string) => TelegramUserClient;
 };
 
 export function createTelegramUserMcpServer(
@@ -55,9 +56,43 @@ export function createTelegramUserMcpServer(
 
   async function getClient(): Promise<TelegramUserClient> {
     getUserApiCredentials();
-    if (!client) client = createClient();
+    if (!client) {
+      // No real session yet, but a login may be in flight from an earlier
+      // process. Its pre-auth session is the auth key the pending code is
+      // bound to; without it the code cannot be redeemed.
+      const resumed =
+        readSessionString() === "" ? (readPendingLogin()?.session ?? undefined) : undefined;
+      client = createClient(resumed);
+    }
     await client.connect();
     return client;
+  }
+
+  // In-memory when the process survived both calls, from disk when it did not.
+  function loadPendingPhone(): PendingPhone | undefined {
+    if (pendingPhone) return pendingPhone;
+    const stored = readPendingLogin();
+    if (stored?.phone === undefined) return undefined;
+    pendingPhone = stored.phone;
+    return pendingPhone;
+  }
+
+  function rememberPendingLogin(
+    active: TelegramUserClient,
+    kind: "phone" | "qr",
+    phone?: PendingPhone,
+  ): void {
+    try {
+      writePendingLogin({
+        kind,
+        session: active.exportSession(),
+        startedAtMs: Date.now(),
+        ...(phone === undefined ? {} : { phone }),
+      });
+    } catch {
+      // Losing the resume file only costs a restart of the login; it must
+      // never fail the call the user is actually making.
+    }
   }
 
   function persist(active: TelegramUserClient): {
@@ -76,6 +111,7 @@ export function createTelegramUserMcpServer(
       token = await active.importLoginToken(token.token);
     }
     if (token.kind === "success") {
+      clearPendingLogin();
       const saved = persist(active);
       return {
         ok: true,
@@ -86,6 +122,7 @@ export function createTelegramUserMcpServer(
     }
     if (password) {
       const me = await active.signInWithPassword(password);
+      clearPendingLogin();
       const saved = persist(active);
       return { ok: true, me, ...saved, warning: SESSION_WARNING };
     }
@@ -165,6 +202,7 @@ export function createTelegramUserMcpServer(
           phoneCodeHash: result.phoneCodeHash,
           isCodeViaApp: result.isCodeViaApp,
         };
+        rememberPendingLogin(active, "phone", pendingPhone);
         return jsonResult({
           ok: true,
           phone: pendingPhone.phone,
@@ -198,17 +236,20 @@ export function createTelegramUserMcpServer(
     },
     async ({ code, password }) => {
       try {
-        if (!pendingPhone) {
+        const pending = loadPendingPhone();
+        if (!pending) {
           return errorResult(
-            new Error("No pending phone login. Call start_login with the phone number first."),
+            new Error(
+              "No pending phone login. Call start_login with the phone number first. If you did, the login code has expired — start over.",
+            ),
           );
         }
         const active = await getClient();
         let me;
         try {
           me = await active.signIn(
-            pendingPhone.phone,
-            pendingPhone.phoneCodeHash,
+            pending.phone,
+            pending.phoneCodeHash,
             code.trim(),
           );
         } catch (err) {
@@ -226,6 +267,7 @@ export function createTelegramUserMcpServer(
           }
         }
         pendingPhone = undefined;
+        clearPendingLogin();
         const saved = persist(active);
         return jsonResult({
           ok: true,
@@ -282,6 +324,7 @@ export function createTelegramUserMcpServer(
         if (token.kind !== "token") {
           return errorResult(new Error("Could not export a QR login token."));
         }
+        rememberPendingLogin(active, "qr");
         return jsonResult({
           ok: true,
           login_url: qrUrl(token.token),

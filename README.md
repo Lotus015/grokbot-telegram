@@ -192,6 +192,8 @@ The plugin declares variables in `.cursor-plugin/plugin.json` and substitutes `$
 
 Optional env (not a marketplace variable): `TELEGRAM_SESSION_PATH` overrides the default session file `~/.grokbot-telegram/user.session`.
 
+Login is two calls — `start_login` sends the code, `complete_login` redeems it — and some MCP hosts start a fresh process per call. So the in-flight state is written next to the session file as `user.session.pending.json` (mode 0600) and picked back up by the next process. It holds a pre-authorization session: it cannot read or send anything, but it is the auth key the code is bound to, so it is deleted the moment login succeeds and discarded after 15 minutes. QR login resumes the same way.
+
 The project was called `cursor-telegram-plugin` before it became `grokbot-telegram`. A session left in the old `~/.cursor-telegram-plugin/user.session` is still read, so an existing login keeps working; new sessions are written to the new path.
 
 ## Example prompts

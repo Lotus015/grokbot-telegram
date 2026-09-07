@@ -55,6 +55,8 @@ Three things the footer logic must keep doing (each has tests):
 2. Count against the 4096-character limit, and **refuse** the send when it overflows — never truncate the caller's text, never drop the footer to make room.
 3. Treat a literal `${TELEGRAM_DISCLAIMER}` as unset. Cursor passes unsubstituted placeholders through verbatim.
 
+**Login must survive a process restart.** `start_login`/`complete_login` and the QR pair run in two different processes under a one-shot MCP host. `pending-login.ts` persists the pre-auth session and `phone_code_hash` next to the session file so the second call can finish. If you touch the login path, keep that working — there is a test that drives two separate server instances. The pending file holds an auth key: mode 0600, deleted on success, expired after 15 minutes.
+
 **Never log or echo secrets.** Bot tokens, `api_hash`, and session strings are redacted through `redact.ts` in each package. Errors go out via `safeErrorMessage`. A session string is full account access — treat it like a password.
 
 **Version numbers move together.** Root `package.json`, `.cursor-plugin/plugin.json`, both `packages/*/package.json`, and the `VERSION` constant in both `src/server.ts` files. `npm run validate` fails if the root and plugin manifests disagree.

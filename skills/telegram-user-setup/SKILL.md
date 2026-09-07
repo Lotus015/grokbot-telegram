@@ -97,3 +97,9 @@ Restarting Cursor reuses the session. Do not check session files into git (they 
 - Automating a **user** account is a Telegram ToS gray area. Keep sends human-paced. No spam or bulk broadcast.
 - Revoke access: Telegram → Settings → Devices → terminate the unknown session, then delete the session file / clear `TELEGRAM_SESSION`.
 - This is **not** Bot API. A bot token cannot log into this server.
+
+## Login survives a restart
+
+`start_login` and `complete_login` do not have to run in the same process. The pending state is persisted next to the session file, so if the MCP server restarts between the two calls, `complete_login` still works — do not make the user start over just because the process cycled.
+
+If `complete_login` reports no pending login, the code genuinely expired (15 minutes). Call `start_login` again.
