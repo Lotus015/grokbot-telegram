@@ -1,7 +1,7 @@
 {
   "name": "telegram-bot",
   "displayName": "Telegram",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Telegram from Cursor in two modes: Bot API (messages as your @bot) and MTProto user account (messages as you). Configure one or both.",
   "author": {
     "name": "Lotus / Lotus015"

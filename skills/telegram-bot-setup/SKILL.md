@@ -19,19 +19,20 @@ Optional: `/setprivacy` (disable privacy mode if the bot should read all group m
 
 ## 2. Put the token in Cursor — not in the repo
 
-1. Install this plugin (Marketplace, [cursor.directory](https://cursor.directory), or a local clone).
-2. Open **Plugins → Configure** for this plugin.
+1. Install this plugin (Marketplace, [cursor.directory](https://cursor.directory), local plugin, or tell Grok Bot “install Telegram”). Fallback: `AddMcpServer` with `npx -y cursor-telegram-bot-mcp` — no repo clone.
+2. Open **Plugins → Configure** for this plugin (or set the MCP env).
 3. Set `TELEGRAM_BOT_TOKEN` to the BotFather token. Leave `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` empty unless they also want user-account mode.
 4. Reload the window if the `telegram-bot` MCP server does not start.
 
-Never commit the token, never paste it into chat, and never put it in `mcp.json`. The plugin only ships a `${TELEGRAM_BOT_TOKEN}` placeholder.
+Never commit the token, never paste it into chat, and never put a real token in `mcp.json`. The plugin only ships a `${TELEGRAM_BOT_TOKEN}` placeholder. Telegram still requires a BotFather token; we cannot skip that.
 
-Hand-running the bot server (development):
+Hand-running the bot server (development, or `npx` after publish):
 
 ```bash
 cp .env.example .env   # then edit locally; .env is gitignored
 export TELEGRAM_BOT_TOKEN="…"   # shell only, do not echo
-node packages/mcp-server/dist/index.js
+npx -y cursor-telegram-bot-mcp
+# from a clone: node packages/mcp-server/dist/index.js
 ```
 
 ## 3. Smoke-test

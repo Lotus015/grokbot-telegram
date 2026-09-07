@@ -34,8 +34,8 @@ if (plugin) {
   if (plugin.name !== "telegram-bot") {
     errors.push(`plugin name must be telegram-bot, got ${plugin.name}`);
   }
-  if (plugin.version !== "0.2.0") {
-    errors.push(`plugin version must be 0.2.0, got ${plugin.version}`);
+  if (plugin.version !== "0.3.0") {
+    errors.push(`plugin version must be 0.3.0, got ${plugin.version}`);
   }
   if (plugin.license !== "MIT") {
     errors.push("plugin license must be MIT");
@@ -88,8 +88,14 @@ if (mcp) {
     if (env.includes("123456789:") || /:\s*"[0-9]{6,}:/.test(env)) {
       errors.push("mcp.json appears to contain a real bot token");
     }
-    if (!args.includes("${PLUGIN_ROOT}") && !args.includes("packages/mcp-server")) {
-      errors.push("telegram-bot should launch packages/mcp-server");
+    if (bot.command !== "npx") {
+      errors.push("telegram-bot must launch via npx (marketplace must not depend on a Desktop clone)");
+    }
+    if (!args.includes("-y") || !args.includes("cursor-telegram-bot-mcp")) {
+      errors.push("telegram-bot must use npx -y cursor-telegram-bot-mcp");
+    }
+    if (args.includes("${PLUGIN_ROOT}") || args.includes("packages/mcp-server")) {
+      errors.push("telegram-bot must not launch a local PLUGIN_ROOT dist path");
     }
   }
   if (!user) errors.push("mcp.json must define mcpServers.telegram-user");
@@ -105,8 +111,14 @@ if (mcp) {
         errors.push(`telegram-user must pass ${placeholder} into the server env`);
       }
     }
-    if (!args.includes("${PLUGIN_ROOT}") && !args.includes("packages/mcp-user-server")) {
-      errors.push("telegram-user should launch packages/mcp-user-server");
+    if (user.command !== "npx") {
+      errors.push("telegram-user must launch via npx (marketplace must not depend on a Desktop clone)");
+    }
+    if (!args.includes("-y") || !args.includes("cursor-telegram-user-mcp")) {
+      errors.push("telegram-user must use npx -y cursor-telegram-user-mcp");
+    }
+    if (args.includes("${PLUGIN_ROOT}") || args.includes("packages/mcp-user-server")) {
+      errors.push("telegram-user must not launch a local PLUGIN_ROOT dist path");
     }
   }
   if (SECRET_SHAPED.test(JSON.stringify(mcp)) && JSON.stringify(mcp).includes(":AAH")) {
@@ -134,8 +146,46 @@ for (const rel of [
   "LICENSE",
   "packages/mcp-server/dist/index.js",
   "packages/mcp-user-server/dist/index.js",
+  "packages/mcp-server/LICENSE",
+  "packages/mcp-user-server/LICENSE",
+  "packages/mcp-server/README.md",
+  "packages/mcp-user-server/README.md",
 ]) {
   read(rel);
+}
+
+function mustPublishable(rel, expectedName, binName) {
+  const pkg = mustJson(rel);
+  if (!pkg) return;
+  if (pkg.private) errors.push(`${rel} must not be private (publish-ready)`);
+  if (pkg.name !== expectedName) errors.push(`${rel} name must be ${expectedName}, got ${pkg.name}`);
+  if (pkg.license !== "MIT") errors.push(`${rel} license must be MIT`);
+  if (!pkg.bin?.[binName]) errors.push(`${rel} must declare bin.${binName}`);
+  if (!pkg.files?.includes("dist")) errors.push(`${rel} files must include dist`);
+  if (!pkg.engines?.node) errors.push(`${rel} must declare engines.node`);
+  const repo = typeof pkg.repository === "string" ? pkg.repository : pkg.repository?.url;
+  if (!String(repo ?? "").includes("github.com/Lotus015/cursor-telegram-plugin")) {
+    errors.push(`${rel} repository must point at https://github.com/Lotus015/cursor-telegram-plugin`);
+  }
+  if (pkg.version !== "0.3.0") errors.push(`${rel} version must be 0.3.0, got ${pkg.version}`);
+}
+
+mustPublishable("packages/mcp-server/package.json", "cursor-telegram-bot-mcp", "cursor-telegram-bot-mcp");
+mustPublishable(
+  "packages/mcp-user-server/package.json",
+  "cursor-telegram-user-mcp",
+  "cursor-telegram-user-mcp",
+);
+
+const readme = read("README.md") ?? "";
+if (!readme.includes("Grok Bot")) {
+  errors.push("README.md must have a Grok Bot / easy install section");
+}
+if (!readme.includes("npx -y cursor-telegram-bot-mcp")) {
+  errors.push("README.md must document npx -y cursor-telegram-bot-mcp");
+}
+if (!readme.includes("npx -y cursor-telegram-user-mcp")) {
+  errors.push("README.md must document npx -y cursor-telegram-user-mcp");
 }
 
 if (errors.length) {

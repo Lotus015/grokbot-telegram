@@ -2,14 +2,83 @@
 
 Installable [Cursor plugin](https://cursor.com/docs/plugins) with **two** first-party MCP servers:
 
-| Mode | MCP server | Identity | Protocol |
-| --- | --- | --- | --- |
-| **Bot** | `telegram-bot` | Your [@BotFather](https://t.me/BotFather) bot | Official [HTTP Bot API](https://core.telegram.org/bots/api) |
-| **User account** | `telegram-user` | **Your personal Telegram account** | [MTProto](https://core.telegram.org/mtproto) via [teleproto](https://github.com/sanyok12345/teleproto) (maintained [GramJS](https://github.com/gram-js/gramjs) fork) |
+| Mode | MCP server | npm package | Identity | Protocol |
+| --- | --- | --- | --- | --- |
+| **Bot** | `telegram-bot` | [`cursor-telegram-bot-mcp`](https://www.npmjs.com/package/cursor-telegram-bot-mcp) | Your [@BotFather](https://t.me/BotFather) bot | Official [HTTP Bot API](https://core.telegram.org/bots/api) |
+| **User account** | `telegram-user` | [`cursor-telegram-user-mcp`](https://www.npmjs.com/package/cursor-telegram-user-mcp) | **Your personal Telegram account** | [MTProto](https://core.telegram.org/mtproto) via [teleproto](https://github.com/sanyok12345/teleproto) |
 
-Use one or both. v0.2.0 keeps the v0.1.0 Bot API path and adds user-account login.
+Use one or both. Dual mode stays: Bot API **and** MTProto user account.
 
-This is **not** Bot API–only, and it is **not** user-account–only. Marketplace copy: a Cursor plugin that can send/read Telegram as a bot **and/or** as the logged-in user.
+## Grok Bot / easy install
+
+Other people should be able to say **“install Telegram”** and get a working connector without cloning this repo.
+
+### Ideal path — Cursor plugin (one click)
+
+1. Install **Telegram** from the [Cursor Marketplace](https://cursor.com/marketplace), a [local plugin](https://cursor.com/docs/plugins) link, or [cursor.directory](https://cursor.directory).
+2. Open **Plugins → Configure** and set credentials for the mode(s) you want (see below).
+3. Reload the window if the MCP servers do not appear.
+
+The plugin’s `mcp.json` launches both servers with `npx -y <package>`. Marketplace / Grok Bot install does **not** need a Desktop clone of this repository.
+
+### Fallback — Grok Bot / Cursor `AddMcpServer`
+
+If the plugin is not listed yet, add the MCP servers directly. No clone:
+
+**Bot API**
+
+```json
+{
+  "mcpServers": {
+    "telegram-bot": {
+      "command": "npx",
+      "args": ["-y", "cursor-telegram-bot-mcp"],
+      "env": {
+        "TELEGRAM_BOT_TOKEN": "your-botfather-token"
+      }
+    }
+  }
+}
+```
+
+**User account**
+
+```json
+{
+  "mcpServers": {
+    "telegram-user": {
+      "command": "npx",
+      "args": ["-y", "cursor-telegram-user-mcp"],
+      "env": {
+        "TELEGRAM_API_ID": "your-api-id",
+        "TELEGRAM_API_HASH": "your-api-hash",
+        "TELEGRAM_SESSION": "your-session-string"
+      }
+    }
+  }
+}
+```
+
+In Grok Bot / Cursor Agent chat you can also ask:
+
+> Add MCP server `telegram-bot` with command `npx`, args `-y cursor-telegram-bot-mcp`, and env `TELEGRAM_BOT_TOKEN`.
+
+or
+
+> Add MCP server `telegram-user` with command `npx`, args `-y cursor-telegram-user-mcp`, and env `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`.
+
+Pin a version if you want (`cursor-telegram-bot-mcp@0.3.0`). Unpinned `npx -y` pulls latest.
+
+### You still must give Telegram credentials
+
+We cannot skip Telegram’s own signup. The user must supply **one** of:
+
+- **Bot mode:** a token from [@BotFather](https://t.me/BotFather) (`TELEGRAM_BOT_TOKEN`), then `/start` the bot so it can reply.
+- **User mode:** `api_id` + `api_hash` from [my.telegram.org/apps](https://my.telegram.org/apps) plus a **one-time login** (phone + code, QR / Link Desktop Device, or an existing session string). Persist `TELEGRAM_SESSION` or the `0600` session file.
+
+No package, plugin, or Grok Bot prompt can invent those. Secrets stay in Cursor **Plugins → Configure** / MCP env — never in git and never inside the npm tarball.
+
+Until Lotus015 runs `npm publish` (see [Publish the npm packages](#publish-the-npm-packages)), `npx -y cursor-telegram-*-mcp` will 404. Local development can still run the committed `dist/` bins with `node packages/.../dist/index.js`.
 
 ## Which mode should I use?
 
@@ -26,7 +95,7 @@ Bot API **cannot** list your personal inbox. User-account mode **can** (`list_di
 ### Bot API (`telegram-bot`)
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) → `/newbot`.
-2. Set **`TELEGRAM_BOT_TOKEN`** in Cursor **Plugins → Configure**.
+2. Set **`TELEGRAM_BOT_TOKEN`** in Cursor **Plugins → Configure** (or the `AddMcpServer` env).
 3. Open a DM with the bot and tap **Start** (`/start`). Bots cannot message you first.
 
 No `api_id` is required for this mode.
@@ -57,11 +126,11 @@ Anyone with `TELEGRAM_BOT_TOKEN` can send as that bot, read updates, and change 
 - Revoke: Telegram → **Settings → Devices** → terminate the unknown session, then delete the session file / clear the variable.
 - Automating a user account is a Telegram ToS gray area. Keep sends human-paced. No spam or bulk broadcast.
 
-The repo never contains real tokens, api hashes, or sessions. `mcp.json` only has `${VAR}` placeholders that match the manifest.
+The repo never contains real tokens, api hashes, or sessions. `mcp.json` only has `${VAR}` placeholders that match the manifest. Published npm packages are self-contained esbuild bundles and do not include credentials.
 
 ## MCP tools
 
-### `telegram-bot` (unchanged Bot API v1)
+### `telegram-bot` (Bot API)
 
 | Tool | Telegram method | Purpose |
 | --- | --- | --- |
@@ -93,7 +162,7 @@ Both servers expose `send_message` and `get_me`. Prefer the MCP server name (`te
 - **telegram-user-setup** — my.telegram.org, first login, session persistence
 - **send-telegram-user-message** — resolve from the dialog list; confirm first
 
-## Install
+## Install (plugin details)
 
 ### Cursor Marketplace (when listed)
 
@@ -101,7 +170,7 @@ Both servers expose `send_message` and `get_me`. Prefer the MCP server name (`te
 2. Install the plugin.
 3. **Plugins → Configure** → set the variables for the mode(s) you want.
 
-### From this repository
+### From this repository (plugin authors / local)
 
 ```bash
 mkdir -p ~/.cursor/plugins/local
@@ -109,6 +178,8 @@ ln -s /path/to/cursor-telegram-plugin ~/.cursor/plugins/local/telegram-bot
 ```
 
 Reload the window (**Developer: Reload Window**). Team / Enterprise admins may need to allow local plugin imports.
+
+The installed plugin still starts the servers via `npx -y cursor-telegram-*-mcp` (see `mcp.json`). You do not need the clone on the machine that *runs* Telegram unless you are changing the source.
 
 Submit the public repo at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) and/or list it on [cursor.directory](https://cursor.directory).
 
@@ -138,6 +209,10 @@ Optional env (not a marketplace variable): `TELEGRAM_SESSION_PATH` overrides the
 - “Search my Telegram dialogs for ‘Ada’, then send this text after I confirm.”
 - “Show recent messages in Saved Messages (`me`) using the user account.”
 
+**Install**
+
+- “Install Telegram” / “Add the Telegram MCP with npx.”
+
 ## How to test
 
 ### Bot API `send_message`
@@ -160,6 +235,8 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"
 ```bash
 export TELEGRAM_API_ID="…"
 export TELEGRAM_API_HASH="…"
+npx -y -p cursor-telegram-user-mcp telegram-user-login
+# or, from a clone:
 node packages/mcp-user-server/dist/login.js
 ```
 
@@ -168,7 +245,7 @@ Or use `start_login` / `start_qr_login` from the agent.
 3. Confirm `get_me` is your user (`isBot: false`).
 4. `list_dialogs` / `search_dialogs`, confirm destination + text, then `send_message`.
 
-Automated tests mock Telegram (no live token or account). Node.js 20+ is required.
+Automated tests mock Telegram (no live token or account). Node.js 20+ is required. `npm test` also packs each package and smokes `npx -y <tarball>` so the published entry lists tools.
 
 ```bash
 npm install --prefix packages/mcp-server
@@ -188,29 +265,29 @@ User-account mode uses the real dialog list and does not have this limitation.
 
 Public packages exist (Bot API wrappers; user MCPs such as [`@overpod/mcp-telegram`](https://www.npmjs.com/package/@overpod/mcp-telegram) / [mcp-telegram/mcp-telegram](https://github.com/mcp-telegram/mcp-telegram)). They are real, but they are either very large or a different product.
 
-This plugin ships two small stdio servers:
+This plugin ships two small stdio servers, **published from this monorepo**:
 
-- **Bot:** official HTTP Bot API only (`packages/mcp-server`)
-- **User:** teleproto MTProto user client (`packages/mcp-user-server`), tools limited to login, dialogs, history, and send
+- **Bot:** official HTTP Bot API only (`packages/mcp-server` → `cursor-telegram-bot-mcp`)
+- **User:** teleproto MTProto user client (`packages/mcp-user-server` → `cursor-telegram-user-mcp`), tools limited to login, dialogs, history, and send
 
-`node` runs committed esbuild bundles under each package’s `dist/` (no extra `npx` package at runtime).
+Each package is an esbuild bundle with a `bin` that speaks MCP over stdio. Runtime credentials are env-only.
 
 ```bash
 npm run build
 ```
 
-`mcp.json` launches both:
+`mcp.json` launches both with npx (no `${PLUGIN_ROOT}` clone):
 
 ```json
 {
   "telegram-bot": {
-    "command": "node",
-    "args": ["${PLUGIN_ROOT}/packages/mcp-server/dist/index.js"],
+    "command": "npx",
+    "args": ["-y", "cursor-telegram-bot-mcp"],
     "env": { "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}" }
   },
   "telegram-user": {
-    "command": "node",
-    "args": ["${PLUGIN_ROOT}/packages/mcp-user-server/dist/index.js"],
+    "command": "npx",
+    "args": ["-y", "cursor-telegram-user-mcp"],
     "env": {
       "TELEGRAM_API_ID": "${TELEGRAM_API_ID}",
       "TELEGRAM_API_HASH": "${TELEGRAM_API_HASH}",
@@ -220,13 +297,35 @@ npm run build
 }
 ```
 
+## Publish the npm packages
+
+Unscoped names **`cursor-telegram-bot-mcp`** and **`cursor-telegram-user-mcp`** were available on the npm registry when this was prepared. Scoped `@lotus015/…` / `@jigjoy/…` would need those npm orgs created first; we did not invent a scope we cannot publish.
+
+This environment has **no npm login** (`npm whoami` → `ENEEDAUTH`). Lotus015 (or the jigjoy npm user) should publish from a machine that is logged in:
+
+```bash
+# once
+npm login
+# confirm: npm whoami
+
+# from the repo root, after tests pass
+npm run build
+npm publish --prefix packages/mcp-server --access public
+npm publish --prefix packages/mcp-user-server --access public
+```
+
+Equivalent: `npm run publish:bot` and `npm run publish:user`. Each package runs `prepublishOnly` → `npm run build`. Do not pass tokens, api hashes, or session strings into the publish environment.
+
+After publish, `npx -y cursor-telegram-bot-mcp` / `npx -y cursor-telegram-user-mcp` work with zero local clone.
+
 ## Marketplace notes
 
 - Single Cursor Plugin (`.cursor-plugin/plugin.json`), not a multi-plugin `marketplace.json` repo.
 - **MTProto user client + Bot API**, not Bot API alone.
 - Plugin `name` remains `telegram-bot` for continuity with v0.1.0; product copy and `displayName` describe both modes.
-- Version `0.2.0`, MIT, logo at `assets/logo.svg`.
+- Version `0.3.0`, MIT, logo at `assets/logo.svg`.
 - Variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` (all optional in the schema).
+- MCP launch: `npx -y cursor-telegram-bot-mcp` and `npx -y cursor-telegram-user-mcp`.
 - Submit: [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
 
 ## Layout
@@ -234,7 +333,7 @@ npm run build
 ```text
 .
 ├── .cursor-plugin/plugin.json
-├── mcp.json
+├── mcp.json                    # npx -y cursor-telegram-*-mcp
 ├── skills/
 │   ├── telegram-mode-guide/SKILL.md
 │   ├── telegram-bot-setup/SKILL.md
@@ -242,8 +341,8 @@ npm run build
 │   ├── telegram-user-setup/SKILL.md
 │   └── send-telegram-user-message/SKILL.md
 ├── assets/logo.svg
-├── packages/mcp-server/        # Bot API MCP + dist bundle
-├── packages/mcp-user-server/   # GramJS user MCP + dist bundle
+├── packages/mcp-server/        # published as cursor-telegram-bot-mcp
+├── packages/mcp-user-server/   # published as cursor-telegram-user-mcp
 ├── LICENSE
 └── README.md
 ```

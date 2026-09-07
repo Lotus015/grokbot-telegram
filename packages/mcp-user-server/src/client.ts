@@ -15,7 +15,7 @@ import {
   type UserInfo,
 } from "./types.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object"

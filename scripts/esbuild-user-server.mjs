@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { chmodSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,8 @@ const pkgDir = join(dirname(fileURLToPath(import.meta.url)), "..", "packages", "
 const require = createRequire(join(pkgDir, "package.json"));
 const esbuild = require("esbuild");
 
-const banner = `import { createRequire as __createRequire } from "node:module";
+const banner = `#!/usr/bin/env node
+import { createRequire as __createRequire } from "node:module";
 const require = __createRequire(import.meta.url);
 `;
 
@@ -28,8 +30,13 @@ await esbuild.build({
   outfile: join(pkgDir, "dist/index.js"),
 });
 
+const loginOut = join(pkgDir, "dist/login.js");
+
 await esbuild.build({
   ...shared,
   entryPoints: [join(pkgDir, "src/login.ts")],
-  outfile: join(pkgDir, "dist/login.js"),
+  outfile: loginOut,
 });
+
+chmodSync(join(pkgDir, "dist/index.js"), 0o755);
+chmodSync(loginOut, 0o755);

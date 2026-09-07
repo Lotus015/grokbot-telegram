@@ -4,7 +4,7 @@ import { chatsFromUpdates, type TelegramUpdate } from "./chats.js";
 import { safeErrorMessage } from "./redact.js";
 import { getMe, getUpdates, sendMessage } from "./telegram.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 function jsonResult(value: unknown) {
   return {
