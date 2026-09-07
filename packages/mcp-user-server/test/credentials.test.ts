@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import {
+  defaultSessionPath,
+  existingSessionPath,
   getUserApiCredentials,
+  legacySessionPath,
   readSessionString,
   sessionSource,
   writeSessionString,
@@ -65,5 +68,42 @@ describe("session file", () => {
     assert.equal(readFileSync(path, "utf8"), "file-session-string");
     assert.equal(sessionSource(), "file");
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("session directory rename", () => {
+  it("reads a session left in the pre-rename directory", () => {
+    const home = mkdtempSync(join(tmpdir(), "tg-home-"));
+    const legacy = legacySessionPath(home);
+    mkdirSync(dirname(legacy), { recursive: true });
+    writeFileSync(legacy, "legacy-session-string", "utf8");
+
+    assert.equal(existingSessionPath({}, home), legacy);
+    assert.equal(defaultSessionPath({}, home).includes(".grokbot-telegram"), true);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("prefers the new directory once a session exists there", () => {
+    const home = mkdtempSync(join(tmpdir(), "tg-home-"));
+    const legacy = legacySessionPath(home);
+    const current = defaultSessionPath({}, home);
+    for (const path of [legacy, current]) {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, `session-at-${path}`, "utf8");
+    }
+
+    assert.equal(existingSessionPath({}, home), current);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("does not fall back when TELEGRAM_SESSION_PATH names a missing file", () => {
+    const home = mkdtempSync(join(tmpdir(), "tg-home-"));
+    const legacy = legacySessionPath(home);
+    mkdirSync(dirname(legacy), { recursive: true });
+    writeFileSync(legacy, "legacy-session-string", "utf8");
+
+    const env = { TELEGRAM_SESSION_PATH: join(home, "elsewhere.session") };
+    assert.equal(existingSessionPath(env, home), null);
+    rmSync(home, { recursive: true, force: true });
   });
 });

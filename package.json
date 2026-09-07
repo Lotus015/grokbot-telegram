@@ -5,13 +5,13 @@
   "license": "MIT",
   "type": "module",
   "author": "Lotus015",
-  "homepage": "https://github.com/Lotus015/cursor-telegram-plugin#readme",
+  "homepage": "https://github.com/Lotus015/grokbot-telegram#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lotus015/cursor-telegram-plugin.git"
+    "url": "git+https://github.com/Lotus015/grokbot-telegram.git"
   },
   "bugs": {
-    "url": "https://github.com/Lotus015/cursor-telegram-plugin/issues"
+    "url": "https://github.com/Lotus015/grokbot-telegram/issues"
   },
   "keywords": [
     "telegram",

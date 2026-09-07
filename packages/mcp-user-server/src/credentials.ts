@@ -20,10 +20,40 @@ function isPlaceholder(value: string): boolean {
   );
 }
 
-export function defaultSessionPath(): string {
-  const fromEnv = process.env.TELEGRAM_SESSION_PATH?.trim();
+// The project was called cursor-telegram-plugin before it became
+// grokbot-telegram. New sessions land in the new directory, but an existing
+// session in the old one is still read, so nobody has to log in again.
+const LEGACY_SESSION_DIR = ".cursor-telegram-plugin";
+const SESSION_DIR = ".grokbot-telegram";
+
+// The home directory is a parameter so the fallback can be tested without
+// touching the real one.
+export function defaultSessionPath(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir(),
+): string {
+  const fromEnv = env.TELEGRAM_SESSION_PATH?.trim();
   if (fromEnv && !fromEnv.includes("${")) return fromEnv;
-  return join(homedir(), ".cursor-telegram-plugin", "user.session");
+  return join(home, SESSION_DIR, "user.session");
+}
+
+export function legacySessionPath(home: string = homedir()): string {
+  return join(home, LEGACY_SESSION_DIR, "user.session");
+}
+
+// Where a session can actually be read from: the configured path first, then
+// the pre-rename location. An explicit TELEGRAM_SESSION_PATH is taken at its
+// word — no silent fallback to a directory the caller did not name.
+export function existingSessionPath(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir(),
+): string | null {
+  const configured = env.TELEGRAM_SESSION_PATH?.trim();
+  const path = defaultSessionPath(env, home);
+  if (existsSync(path)) return path;
+  if (configured && !configured.includes("${")) return null;
+  const legacy = legacySessionPath(home);
+  return existsSync(legacy) ? legacy : null;
 }
 
 export function getUserApiCredentials(): { apiId: number; apiHash: string } {
@@ -51,8 +81,8 @@ export function getUserApiCredentials(): { apiId: number; apiHash: string } {
 export function readSessionString(): string {
   const fromEnv = process.env.TELEGRAM_SESSION?.trim() ?? "";
   if (fromEnv && !isPlaceholder(fromEnv)) return fromEnv;
-  const path = defaultSessionPath();
-  if (!existsSync(path)) return "";
+  const path = existingSessionPath();
+  if (path === null) return "";
   return readFileSync(path, "utf8").trim();
 }
 
@@ -66,6 +96,6 @@ export function writeSessionString(session: string): string {
 export function sessionSource(): "env" | "file" | "none" {
   const fromEnv = process.env.TELEGRAM_SESSION?.trim() ?? "";
   if (fromEnv && !isPlaceholder(fromEnv)) return "env";
-  if (existsSync(defaultSessionPath())) return "file";
+  if (existingSessionPath() !== null) return "file";
   return "none";
 }

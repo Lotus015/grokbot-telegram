@@ -15,7 +15,7 @@ This plugin does **not** require `TELEGRAM_BOT_TOKEN` for user-account mode.
 
 1. **`TELEGRAM_API_ID`** and **`TELEGRAM_API_HASH`** from [my.telegram.org/apps](https://my.telegram.org/apps) (Telegram login, then **API development tools** → create an app).
 2. A **one-time login**: phone + login code (and 2FA cloud password if enabled), **or** QR (“Link Desktop Device”), **or** an existing GramJS / teleproto / Telethon **session string**.
-3. After login, persist the session as `TELEGRAM_SESSION` in Plugins → Configure and/or keep the local session file (`~/.cursor-telegram-plugin/user.session`, mode `0600`).
+3. After login, persist the session as `TELEGRAM_SESSION` in Plugins → Configure and/or keep the local session file (`~/.grokbot-telegram/user.session`, mode `0600`).
 
 Ping the user for api_id / api_hash / phone or QR. **Never ask them to paste secrets into git.** Prefer Plugins → Configure. If they must show a session string once so it can be saved, tell them to store it immediately and not to repeat it in later chats.
 
@@ -62,7 +62,7 @@ export TELEGRAM_API_HASH="…"
 node packages/mcp-user-server/dist/login.js
 ```
 
-The CLI writes `~/.cursor-telegram-plugin/user.session` (`0600`) and prints the session string once.
+The CLI writes `~/.grokbot-telegram/user.session` (`0600`) and prints the session string once.
 
 ## 3. Smoke-test
 
@@ -76,7 +76,7 @@ The CLI writes `~/.cursor-telegram-plugin/user.session` (`0600`) and prints the 
 | --- | --- |
 | `TELEGRAM_SESSION` env / Plugins → Configure | Highest |
 | `TELEGRAM_SESSION_PATH` file | If env session is empty |
-| `~/.cursor-telegram-plugin/user.session` | Default file |
+| `~/.grokbot-telegram/user.session` | Default file |
 
 Restarting Cursor reuses the session. Do not check session files into git (they are gitignored).
 

@@ -36,7 +36,7 @@ No `api_id` is required for this mode.
 1. Open [https://my.telegram.org/apps](https://my.telegram.org/apps), log in with the **same phone** as the Telegram account you want to use, and create an app.
 2. Set **`TELEGRAM_API_ID`** and **`TELEGRAM_API_HASH`** in **Plugins → Configure**.
 3. Complete **one-time login** (phone + code, QR / Link Desktop Device, or an existing session string).
-4. Persist the session as **`TELEGRAM_SESSION`** and/or the file `~/.cursor-telegram-plugin/user.session` (mode `0600`).
+4. Persist the session as **`TELEGRAM_SESSION`** and/or the file `~/.grokbot-telegram/user.session` (mode `0600`).
 
 You will be asked for api_id / api_hash / login on first run. A bot token is **not** used for this server.
 
@@ -163,7 +163,7 @@ Drop this into any MCP client config (Claude Code, Claude Desktop, Cursor, …):
 
 ```bash
 mkdir -p ~/.cursor/plugins/local
-ln -s /path/to/cursor-telegram-plugin ~/.cursor/plugins/local/telegram-bot
+ln -s /path/to/grokbot-telegram ~/.cursor/plugins/local/telegram-bot
 ```
 
 Reload the window (**Developer: Reload Window**). Team / Enterprise admins may need to allow local plugin imports.
@@ -184,7 +184,9 @@ The plugin declares variables in `.cursor-plugin/plugin.json` and substitutes `$
 | `TELEGRAM_SESSION` | User | Returned after first login (optional if the session file exists) |
 | `TELEGRAM_DISCLAIMER` | Both | Optional. Footer wording, or `off` to disable (see below) |
 
-Optional env (not a marketplace variable): `TELEGRAM_SESSION_PATH` overrides the default session file `~/.cursor-telegram-plugin/user.session`.
+Optional env (not a marketplace variable): `TELEGRAM_SESSION_PATH` overrides the default session file `~/.grokbot-telegram/user.session`.
+
+The project was called `cursor-telegram-plugin` before it became `grokbot-telegram`. A session left in the old `~/.cursor-telegram-plugin/user.session` is still read, so an existing login keeps working; new sessions are written to the new path.
 
 ## Example prompts
 
