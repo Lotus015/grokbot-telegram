@@ -38,6 +38,7 @@ npm run build      # per-package esbuild bundles, then collect into root dist/
 npm test           # both packages, node:test, no network
 npm run typecheck  # tsc --noEmit in both packages
 npm run validate   # manifest + wiring invariants
+npm run smoke      # pack the tarball and drive the binary out of it
 ```
 
 Dependencies live per package (`npm install --prefix packages/mcp-server`, same for the other). The root has no `node_modules`; it only orchestrates.
@@ -67,7 +68,9 @@ npm publish        # from the repo root
 
 `prepublishOnly` runs build + test + validate, so a stale `dist/` cannot ship.
 
-Gotcha worth remembering: the `bin` path must be `"dist/cli.js"`, **not** `"./dist/cli.js"`. npm silently strips the bin entry for the `./` form, and the published package ends up with no executable — `npx grokbot-telegram` then does nothing. Always check `npm publish --dry-run` output for `npm warn publish`.
+Gotcha worth remembering: the `bin` path must be `"dist/cli.js"`, **not** `"./dist/cli.js"`. npm silently strips the bin entry for the `./` form, and the published package ends up with no executable — `npx grokbot-telegram` then does nothing.
+
+`npm run smoke` guards this: it packs the real tarball, unpacks it, asserts the manifest and shebang survived, and runs an MCP `initialize` + `tools/list` against `dist/cli.js` in both modes. It runs as part of `prepublishOnly`. When you change anything about packaging, run it — a `npm publish --dry-run` that looks fine can still ship a package with no working binary.
 
 ## Adding a tool
 

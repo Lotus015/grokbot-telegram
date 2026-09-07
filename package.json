@@ -45,6 +45,7 @@
     "test": "npm test --prefix packages/mcp-server && npm test --prefix packages/mcp-user-server",
     "typecheck": "npm run typecheck --prefix packages/mcp-server && npm run typecheck --prefix packages/mcp-user-server",
     "validate": "node scripts/validate-plugin.mjs",
-    "prepublishOnly": "npm run build && npm test && npm run validate"
+    "prepublishOnly": "npm run build && npm test && npm run validate && npm run smoke",
+    "smoke": "node scripts/pack-smoke.mjs"
   }
 }
