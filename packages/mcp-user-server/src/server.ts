@@ -11,7 +11,7 @@ import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
 import { isPasswordNeeded, type TelegramUserClient } from "./types.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 
 const SESSION_WARNING =
   "This session string is full access to the personal Telegram account. Save it in Plugins → Configure as TELEGRAM_SESSION (or keep the session file). Never commit it. Treat it like a password.";

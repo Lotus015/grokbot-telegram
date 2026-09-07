@@ -1,7 +1,11 @@
 // Every outgoing message carries a footer saying it was sent by the agent.
 // Set TELEGRAM_DISCLAIMER to change the wording, or to "off" to drop it.
+//
+// The wording names the package rather than linking to it. A URL here would
+// make Telegram attach a link-preview card to every message the user sends,
+// and reads as advertising in a personal chat; the name is still searchable.
 
-export const DEFAULT_DISCLAIMER = "— This message was sent by Grok Bot.";
+export const DEFAULT_DISCLAIMER = "— sent by grokbot-telegram";
 export const TELEGRAM_TEXT_LIMIT = 4096;
 
 const OFF_VALUES = new Set(["", "off", "false", "0", "no", "none", "disabled"]);

@@ -11,6 +11,10 @@ import {
 describe("user disclaimer", () => {
   it("says the message was sent on the account owner's behalf", () => {
     assert.match(DEFAULT_DISCLAIMER, /on my behalf/);
+    // The footer names the package so a recipient can find it by searching.
+    assert.match(DEFAULT_DISCLAIMER, /grokbot-telegram/);
+    // No URL: Telegram would attach a link-preview card to every message.
+    assert.equal(/https?:\/\//.test(DEFAULT_DISCLAIMER), false);
     assert.equal(
       applyDisclaimer("hi", {}),
       `hi\n\n${DEFAULT_DISCLAIMER}`,

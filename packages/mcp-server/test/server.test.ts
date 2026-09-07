@@ -64,10 +64,7 @@ describe("telegram MCP server", () => {
         text: string;
       };
       assert.equal(body.chat_id, 99);
-      assert.equal(
-        body.text,
-        "hello from test\n\n— This message was sent by Grok Bot.",
-      );
+      assert.equal(body.text, "hello from test\n\n— sent by grokbot-telegram");
       return new Response(
         JSON.stringify({
           ok: true,

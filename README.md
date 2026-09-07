@@ -1,5 +1,9 @@
 # Telegram for Cursor
 
+[![npm](https://img.shields.io/npm/v/grokbot-telegram.svg)](https://www.npmjs.com/package/grokbot-telegram)
+[![CI](https://github.com/Lotus015/grokbot-telegram/actions/workflows/ci.yml/badge.svg)](https://github.com/Lotus015/grokbot-telegram/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/grokbot-telegram.svg)](LICENSE)
+
 Installable [Cursor plugin](https://cursor.com/docs/plugins) with **two** first-party MCP servers:
 
 | Mode | MCP server | Identity | Protocol |
@@ -49,16 +53,18 @@ Every message sent through either server carries a footer, so the person on the 
 ```
 your message text
 
-— This message was sent by Grok Bot on my behalf.
+— sent by grokbot-telegram on my behalf
 ```
 
-The Bot API server uses `— This message was sent by Grok Bot.` (it is already visibly a bot). `TELEGRAM_DISCLAIMER` controls it:
+The Bot API server uses `— sent by grokbot-telegram` (it is already visibly a bot). `TELEGRAM_DISCLAIMER` controls it:
 
 | Value | Result |
 | --- | --- |
 | unset | default wording above |
 | any text | that text is used verbatim |
 | `off`, `false`, `0`, `no`, `none`, empty | no footer |
+
+The wording names the package rather than linking to it, on purpose. A URL in the footer would make Telegram attach a link-preview card to every message you send, and a link in someone's personal chat reads as advertising — the name is still searchable on npm and GitHub. Set `TELEGRAM_DISCLAIMER` to a URL yourself if you disagree.
 
 Two details worth knowing:
 

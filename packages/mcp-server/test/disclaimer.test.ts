@@ -43,11 +43,32 @@ describe("bot disclaimer", () => {
   });
 
   it("escapes the footer for MarkdownV2 so Telegram does not reject it", () => {
+    // Telegram rejects the whole message if any of these appear unescaped.
+    const SPECIAL = new Set("_*[]()~`>#+-=|{}.!\\");
     const sent = applyDisclaimer("*bold*", "MarkdownV2", {});
-    // A bare "." or "-" is a syntax error in MarkdownV2.
-    assert.equal(sent.includes("\\."), true);
-    assert.equal(/(?<!\\)\.$/.test(sent), false);
     assert.equal(sent.startsWith("*bold*\n\n"), true);
+
+    const footer = sent.slice("*bold*\n\n".length);
+    let escaped = 0;
+    for (let i = 0; i < footer.length; i += 1) {
+      const ch = footer[i];
+      if (ch === "\\") {
+        i += 1;
+        escaped += 1;
+        continue;
+      }
+      assert.equal(
+        SPECIAL.has(ch),
+        false,
+        `unescaped ${JSON.stringify(ch)} at ${i} in footer ${JSON.stringify(footer)}`,
+      );
+    }
+    // Guard against the assertion above passing simply because the wording
+    // stopped containing anything that needs escaping.
+    assert.ok(
+      escaped > 0,
+      `default footer ${JSON.stringify(DEFAULT_DISCLAIMER)} exercises no escaping`,
+    );
   });
 
   it("escapes the footer for HTML and legacy Markdown", () => {

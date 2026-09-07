@@ -55,6 +55,6 @@ After a successful send, report `message_id` and destination chat (id, title/nam
 
 ## Disclaimer footer
 
-The server appends a footer to every message (`— This message was sent by Grok Bot.`) unless `TELEGRAM_DISCLAIMER` is off. Do not write your own footer into `text` — you would get two. Show the user the text they asked for, and mention the footer only if they ask about it.
+The server appends a footer to every message (`— sent by grokbot-telegram`) unless `TELEGRAM_DISCLAIMER` is off. Do not write your own footer into `text` — you would get two. Show the user the text they asked for, and mention the footer only if they ask about it.
 
 The footer counts against the 4096-character limit. If a send is refused for length, shorten the message or split it; do not disable the disclaimer to make room unless the user explicitly asks.

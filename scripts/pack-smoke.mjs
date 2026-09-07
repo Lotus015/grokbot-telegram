@@ -128,12 +128,27 @@ try {
     `user mode listed unexpected tools: ${user.join(", ")}`,
   );
 
-  // The disclaimer is a trust promise; it has to survive bundling.
-  for (const file of ["bot.js", "user.js"]) {
-    const bundle = readFileSync(join(pkgRoot, "dist", file), "utf8");
+  // The disclaimer is a trust promise; it has to survive bundling. Read the
+  // expected wording out of the source so a reworded footer cannot make this
+  // check quietly vacuous.
+  for (const [file, source] of [
+    ["bot.js", "packages/mcp-server/src/disclaimer.ts"],
+    ["user.js", "packages/mcp-user-server/src/disclaimer.ts"],
+  ]) {
+    const declared = readFileSync(join(root, source), "utf8");
+    const match = declared.match(/DEFAULT_DISCLAIMER\s*=\s*\n?\s*"([^"]+)"/);
+    if (match === null) {
+      failures.push(`could not read DEFAULT_DISCLAIMER out of ${source}`);
+      continue;
+    }
+    // esbuild emits ASCII by default, so the em dash lands as \u2014.
+    const bundle = readFileSync(join(pkgRoot, "dist", file), "utf8").replace(
+      /\\u([0-9a-fA-F]{4})/g,
+      (_, hex) => String.fromCharCode(parseInt(hex, 16)),
+    );
     check(
-      bundle.includes("This message was sent by Grok Bot"),
-      `dist/${file} does not contain the disclaimer footer`,
+      bundle.includes(match[1]),
+      `dist/${file} does not carry the disclaimer footer ${JSON.stringify(match[1])}`,
     );
   }
 

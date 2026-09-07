@@ -47,6 +47,6 @@ After success, report message id, destination title/id, and that it was sent **a
 
 ## Disclaimer footer
 
-Messages here go out **as the human account owner**, so the server appends `— This message was sent by Grok Bot on my behalf.` to every one of them unless `TELEGRAM_DISCLAIMER` is off. Do not write your own footer into `text` — you would get two.
+Messages here go out **as the human account owner**, so the server appends `— sent by grokbot-telegram on my behalf` to every one of them unless `TELEGRAM_DISCLAIMER` is off. Do not write your own footer into `text` — you would get two.
 
 The footer counts against the 4096-character limit. If a send is refused for length, shorten the message or split it; do not disable the disclaimer to make room unless the user explicitly asks.

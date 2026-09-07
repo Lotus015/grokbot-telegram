@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor the engines field promises, and current LTS.
+        node: ["20", "22"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Each package carries its own lockfile; there is no root install.
+      - name: Install
+        run: |
+          npm ci --prefix packages/mcp-server
+          npm ci --prefix packages/mcp-user-server
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate plugin manifests
+        run: npm run validate
+
+      # Packs the real tarball and runs the binary out of it. This is the only
+      # step that sees what a user would actually install.
+      - name: Pack smoke
+        run: npm run smoke

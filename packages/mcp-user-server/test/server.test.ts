@@ -161,7 +161,7 @@ describe("telegram user MCP server", () => {
       assert.equal(parsed.identity, "user-account");
       assert.equal(
         parsed.text,
-        "hello from test\n\n— This message was sent by Grok Bot on my behalf.",
+        "hello from test\n\n— sent by grokbot-telegram on my behalf",
       );
 
       const meResult = await client.callTool({ name: "get_me", arguments: {} });
