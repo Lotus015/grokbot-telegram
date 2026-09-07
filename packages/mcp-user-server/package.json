@@ -1,6 +1,6 @@
 {
   "name": "telegram-user-mcp-server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Stdio MCP server wrapping teleproto (maintained GramJS fork) for personal Telegram account MTProto access.",
   "type": "module",

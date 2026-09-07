@@ -1,10 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { chatsFromUpdates, type TelegramUpdate } from "./chats.js";
+import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
 import { getMe, getUpdates, sendMessage } from "./telegram.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 function jsonResult(value: unknown) {
   return {
@@ -60,7 +61,7 @@ export function createTelegramMcpServer(): McpServer {
     {
       title: "Send Telegram message",
       description:
-        "[Bot API] Send as the bot via sendMessage (not the user's personal account). Confirm destination and text before sending consequential messages. chat_id may be a number or @username for a public channel/group.",
+        "[Bot API] Send as the bot via sendMessage (not the user's personal account). Confirm destination and text before sending consequential messages. chat_id may be a number or @username for a public channel/group. A disclaimer footer is appended to every message unless TELEGRAM_DISCLAIMER is off, and it counts against Telegram's 4096-character limit.",
       inputSchema: z.object({
         chat_id: chatIdSchema,
         text: z.string().min(1).max(4096).describe("Message text to send."),
@@ -78,8 +79,12 @@ export function createTelegramMcpServer(): McpServer {
     },
     async ({ chat_id, text, parse_mode }) => {
       try {
-        const result = await sendMessage({ chat_id, text, parse_mode });
-        return jsonResult(result);
+        const result = await sendMessage({
+          chat_id,
+          text: applyDisclaimer(text, parse_mode),
+          parse_mode,
+        });
+        return jsonResult({ ...result, disclaimer: disclaimerText() });
       } catch (err) {
         return errorResult(err);
       }

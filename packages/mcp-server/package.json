@@ -1,6 +1,6 @@
 {
   "name": "telegram-bot-mcp-server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Stdio MCP server wrapping the Telegram Bot API for the telegram-bot Cursor plugin.",
   "type": "module",

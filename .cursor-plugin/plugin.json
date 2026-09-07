@@ -1,7 +1,7 @@
 {
   "name": "telegram-bot",
   "displayName": "Telegram",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Telegram from Cursor in two modes: Bot API (messages as your @bot) and MTProto user account (messages as you). Configure one or both.",
   "author": {
     "name": "Lotus / Lotus015"
@@ -41,7 +41,12 @@
       "TELEGRAM_SESSION": {
         "type": "string",
         "title": "Telegram session string (user-account mode)",
-        "description": "teleproto/GramJS/Telethon-style StringSession after first login. Optional if a session file already exists. Equivalent to a password for your personal Telegram account — never commit it."
+        "description": "teleproto/GramJS/Telethon-style StringSession after first login. Optional if a session file already exists. Equivalent to a password for your personal Telegram account \u2014 never commit it."
+      },
+      "TELEGRAM_DISCLAIMER": {
+        "type": "string",
+        "title": "Message disclaimer footer (both modes)",
+        "description": "Text appended to every message this plugin sends, so recipients know an agent sent it. Leave empty for the default (\"\u2014 This message was sent by Grok Bot...\"). Set to off to send messages with no footer."
       }
     }
   }

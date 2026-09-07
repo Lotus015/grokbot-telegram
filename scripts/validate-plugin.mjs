@@ -34,8 +34,8 @@ if (plugin) {
   if (plugin.name !== "telegram-bot") {
     errors.push(`plugin name must be telegram-bot, got ${plugin.name}`);
   }
-  if (plugin.version !== "0.2.0") {
-    errors.push(`plugin version must be 0.2.0, got ${plugin.version}`);
+  if (!/^\d+\.\d+\.\d+$/.test(plugin.version ?? "")) {
+    errors.push(`plugin version must be semver, got ${plugin.version}`);
   }
   if (plugin.license !== "MIT") {
     errors.push("plugin license must be MIT");
@@ -74,6 +74,28 @@ if (plugin) {
   }
 }
 
+const rootPkg = mustJson("package.json");
+const PACKAGE_NAME = rootPkg?.name ?? "grokbot-telegram";
+if (rootPkg) {
+  if (rootPkg.private) {
+    errors.push("root package.json must not be private — it is the published package");
+  }
+  if (rootPkg.publishConfig?.access !== "public") {
+    errors.push('root package.json needs publishConfig.access = "public"');
+  }
+  if (rootPkg.type !== "module") {
+    errors.push('root package.json needs "type": "module" so dist/*.js load as ESM');
+  }
+  if (!rootPkg.bin?.[PACKAGE_NAME]) {
+    errors.push(`root package.json must expose a ${PACKAGE_NAME} bin`);
+  }
+  if (rootPkg.version !== plugin?.version) {
+    errors.push(
+      `package.json version (${rootPkg.version}) must match plugin.json (${plugin?.version})`,
+    );
+  }
+}
+
 const mcp = mustJson("mcp.json");
 if (mcp) {
   const bot = mcp.mcpServers?.["telegram-bot"];
@@ -88,8 +110,8 @@ if (mcp) {
     if (env.includes("123456789:") || /:\s*"[0-9]{6,}:/.test(env)) {
       errors.push("mcp.json appears to contain a real bot token");
     }
-    if (!args.includes("${PLUGIN_ROOT}") && !args.includes("packages/mcp-server")) {
-      errors.push("telegram-bot should launch packages/mcp-server");
+    if (bot.command !== "npx" || !args.includes(PACKAGE_NAME) || !args.includes('"bot"')) {
+      errors.push(`telegram-bot should launch: npx -y ${PACKAGE_NAME} bot`);
     }
   }
   if (!user) errors.push("mcp.json must define mcpServers.telegram-user");
@@ -105,8 +127,8 @@ if (mcp) {
         errors.push(`telegram-user must pass ${placeholder} into the server env`);
       }
     }
-    if (!args.includes("${PLUGIN_ROOT}") && !args.includes("packages/mcp-user-server")) {
-      errors.push("telegram-user should launch packages/mcp-user-server");
+    if (user.command !== "npx" || !args.includes(PACKAGE_NAME) || !args.includes('"user"')) {
+      errors.push(`telegram-user should launch: npx -y ${PACKAGE_NAME} user`);
     }
   }
   if (SECRET_SHAPED.test(JSON.stringify(mcp)) && JSON.stringify(mcp).includes(":AAH")) {
@@ -134,6 +156,10 @@ for (const rel of [
   "LICENSE",
   "packages/mcp-server/dist/index.js",
   "packages/mcp-user-server/dist/index.js",
+  "dist/cli.js",
+  "dist/bot.js",
+  "dist/user.js",
+  "dist/login.js",
 ]) {
   read(rel);
 }

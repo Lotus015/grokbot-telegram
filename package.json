@@ -1,15 +1,50 @@
 {
-  "name": "cursor-telegram-plugin",
-  "private": true,
-  "description": "Cursor plugin: Telegram Bot API + MTProto user-account MCP",
+  "name": "grokbot-telegram",
+  "version": "0.3.0",
+  "description": "Telegram MCP servers in one command: Bot API (send as your @bot) and MTProto user account (send as you).",
   "license": "MIT",
-  "scripts": {
-    "build": "npm run build --prefix packages/mcp-server && npm run build --prefix packages/mcp-user-server",
-    "test": "npm test --prefix packages/mcp-server && npm test --prefix packages/mcp-user-server",
-    "typecheck": "npm run typecheck --prefix packages/mcp-server && npm run typecheck --prefix packages/mcp-user-server",
-    "validate": "node scripts/validate-plugin.mjs"
+  "type": "module",
+  "author": "Lotus015",
+  "homepage": "https://github.com/Lotus015/cursor-telegram-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lotus015/cursor-telegram-plugin.git"
   },
+  "bugs": {
+    "url": "https://github.com/Lotus015/cursor-telegram-plugin/issues"
+  },
+  "keywords": [
+    "telegram",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "bot-api",
+    "mtproto",
+    "cursor",
+    "claude",
+    "messaging"
+  ],
+  "bin": {
+    "grokbot-telegram": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "mcp.json",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "npm run build --prefix packages/mcp-server && npm run build --prefix packages/mcp-user-server && node scripts/build-dist.mjs",
+    "test": "npm test --prefix packages/mcp-server && npm test --prefix packages/mcp-user-server",
+    "typecheck": "npm run typecheck --prefix packages/mcp-server && npm run typecheck --prefix packages/mcp-user-server",
+    "validate": "node scripts/validate-plugin.mjs",
+    "prepublishOnly": "npm run build && npm test && npm run validate"
   }
 }

@@ -7,7 +7,7 @@ Installable [Cursor plugin](https://cursor.com/docs/plugins) with **two** first-
 | **Bot** | `telegram-bot` | Your [@BotFather](https://t.me/BotFather) bot | Official [HTTP Bot API](https://core.telegram.org/bots/api) |
 | **User account** | `telegram-user` | **Your personal Telegram account** | [MTProto](https://core.telegram.org/mtproto) via [teleproto](https://github.com/sanyok12345/teleproto) (maintained [GramJS](https://github.com/gram-js/gramjs) fork) |
 
-Use one or both. v0.2.0 keeps the v0.1.0 Bot API path and adds user-account login.
+Use one or both. v0.2.0 kept the v0.1.0 Bot API path and added user-account login; v0.3.0 ships both servers as the single npm package `grokbot-telegram` and appends a disclaimer footer to every outgoing message.
 
 This is **not** Bot API–only, and it is **not** user-account–only. Marketplace copy: a Cursor plugin that can send/read Telegram as a bot **and/or** as the logged-in user.
 
@@ -41,6 +41,29 @@ No `api_id` is required for this mode.
 You will be asked for api_id / api_hash / login on first run. A bot token is **not** used for this server.
 
 **The session is full account access.** Treat it like a password. Never commit it.
+
+## Message disclaimer
+
+Every message sent through either server carries a footer, so the person on the other end knows an agent — not a human typing — produced it:
+
+```
+your message text
+
+— This message was sent by Grok Bot on my behalf.
+```
+
+The Bot API server uses `— This message was sent by Grok Bot.` (it is already visibly a bot). `TELEGRAM_DISCLAIMER` controls it:
+
+| Value | Result |
+| --- | --- |
+| unset | default wording above |
+| any text | that text is used verbatim |
+| `off`, `false`, `0`, `no`, `none`, empty | no footer |
+
+Two details worth knowing:
+
+- The footer counts against Telegram's 4096-character limit. If text + footer would exceed it, the send is **refused** with an error naming the overflow rather than quietly truncating your words or dropping the footer.
+- With `parse_mode`, the footer is escaped for that mode. This matters for `MarkdownV2`, where an unescaped `.` or `-` makes Telegram reject the whole message.
 
 ## Security
 
@@ -95,6 +118,41 @@ Both servers expose `send_message` and `get_me`. Prefer the MCP server name (`te
 
 ## Install
 
+### Any MCP client (`npx`)
+
+Both servers ship as one npm package, [`grokbot-telegram`](https://www.npmjs.com/package/grokbot-telegram), behind a single command:
+
+```bash
+npx grokbot-telegram bot     # Bot API server over stdio
+npx grokbot-telegram user    # user-account (MTProto) server over stdio
+npx grokbot-telegram login   # interactive login, prints a TELEGRAM_SESSION
+```
+
+With no command the mode is read from the environment: `TELEGRAM_BOT_TOKEN` selects `bot`, `TELEGRAM_API_ID` + `TELEGRAM_API_HASH` select `user`. If both are set it refuses to guess and asks for an explicit mode.
+
+Drop this into any MCP client config (Claude Code, Claude Desktop, Cursor, …):
+
+```json
+{
+  "mcpServers": {
+    "telegram-bot": {
+      "command": "npx",
+      "args": ["-y", "grokbot-telegram", "bot"],
+      "env": { "TELEGRAM_BOT_TOKEN": "…" }
+    },
+    "telegram-user": {
+      "command": "npx",
+      "args": ["-y", "grokbot-telegram", "user"],
+      "env": {
+        "TELEGRAM_API_ID": "…",
+        "TELEGRAM_API_HASH": "…",
+        "TELEGRAM_SESSION": "…"
+      }
+    }
+  }
+}
+```
+
 ### Cursor Marketplace (when listed)
 
 1. Open **Customize** → search **telegram-bot**, or visit [cursor.com/marketplace](https://cursor.com/marketplace).
@@ -110,6 +168,8 @@ ln -s /path/to/cursor-telegram-plugin ~/.cursor/plugins/local/telegram-bot
 
 Reload the window (**Developer: Reload Window**). Team / Enterprise admins may need to allow local plugin imports.
 
+Note that `mcp.json` launches the servers through `npx grokbot-telegram`, so a symlinked clone still runs the **published** build, not your working tree. To exercise local changes, either `npm run build && npm link` in the repo root, or point `mcp.json` at `${PLUGIN_ROOT}/dist/bot.js` and `${PLUGIN_ROOT}/dist/user.js` with `"command": "node"` while you work (`npm run validate` will flag that, which is the reminder to change it back).
+
 Submit the public repo at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) and/or list it on [cursor.directory](https://cursor.directory).
 
 ## Configure
@@ -122,6 +182,7 @@ The plugin declares variables in `.cursor-plugin/plugin.json` and substitutes `$
 | `TELEGRAM_API_ID` | User | [my.telegram.org/apps](https://my.telegram.org/apps) |
 | `TELEGRAM_API_HASH` | User | [my.telegram.org/apps](https://my.telegram.org/apps) |
 | `TELEGRAM_SESSION` | User | Returned after first login (optional if the session file exists) |
+| `TELEGRAM_DISCLAIMER` | Both | Optional. Footer wording, or `off` to disable (see below) |
 
 Optional env (not a marketplace variable): `TELEGRAM_SESSION_PATH` overrides the default session file `~/.cursor-telegram-plugin/user.session`.
 
@@ -160,8 +221,10 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"
 ```bash
 export TELEGRAM_API_ID="…"
 export TELEGRAM_API_HASH="…"
-node packages/mcp-user-server/dist/login.js
+npx grokbot-telegram login
 ```
+
+From a clone, the equivalent is `node dist/login.js` after `npm run build`.
 
 Or use `start_login` / `start_qr_login` from the agent.
 
@@ -173,10 +236,13 @@ Automated tests mock Telegram (no live token or account). Node.js 20+ is require
 ```bash
 npm install --prefix packages/mcp-server
 npm install --prefix packages/mcp-user-server
-npm test
-npm run build
-npm run validate
+npm test          # both packages
+npm run typecheck
+npm run build     # per-package bundles, then collected into the root dist/
+npm run validate  # manifest + wiring invariants
 ```
+
+Working on this with a coding agent? Start from [AGENTS.md](AGENTS.md).
 
 ## Chat list limitation (Bot API only)
 
@@ -193,7 +259,10 @@ This plugin ships two small stdio servers:
 - **Bot:** official HTTP Bot API only (`packages/mcp-server`)
 - **User:** teleproto MTProto user client (`packages/mcp-user-server`), tools limited to login, dialogs, history, and send
 
-`node` runs committed esbuild bundles under each package’s `dist/` (no extra `npx` package at runtime).
+Both are bundled with esbuild — every dependency (including teleproto) is inlined, so the published package installs with zero runtime dependencies. `npm run build` produces the per-package bundles and collects them into the publishable root `dist/`:
+
+- `dist/bot.js`, `dist/user.js`, `dist/login.js` — the bundles
+- `dist/cli.js` — the `grokbot-telegram` dispatcher that picks between them
 
 ```bash
 npm run build
@@ -204,13 +273,13 @@ npm run build
 ```json
 {
   "telegram-bot": {
-    "command": "node",
-    "args": ["${PLUGIN_ROOT}/packages/mcp-server/dist/index.js"],
+    "command": "npx",
+    "args": ["-y", "grokbot-telegram", "bot"],
     "env": { "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}" }
   },
   "telegram-user": {
-    "command": "node",
-    "args": ["${PLUGIN_ROOT}/packages/mcp-user-server/dist/index.js"],
+    "command": "npx",
+    "args": ["-y", "grokbot-telegram", "user"],
     "env": {
       "TELEGRAM_API_ID": "${TELEGRAM_API_ID}",
       "TELEGRAM_API_HASH": "${TELEGRAM_API_HASH}",
@@ -225,8 +294,8 @@ npm run build
 - Single Cursor Plugin (`.cursor-plugin/plugin.json`), not a multi-plugin `marketplace.json` repo.
 - **MTProto user client + Bot API**, not Bot API alone.
 - Plugin `name` remains `telegram-bot` for continuity with v0.1.0; product copy and `displayName` describe both modes.
-- Version `0.2.0`, MIT, logo at `assets/logo.svg`.
-- Variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` (all optional in the schema).
+- Version `0.3.0`, MIT, logo at `assets/logo.svg`.
+- Variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_DISCLAIMER` (all optional in the schema).
 - Submit: [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
 
 ## Layout
@@ -242,6 +311,9 @@ npm run build
 │   ├── telegram-user-setup/SKILL.md
 │   └── send-telegram-user-message/SKILL.md
 ├── assets/logo.svg
+├── AGENTS.md                   # guidance for coding agents (CLAUDE.md points here)
+├── src/cli.js                  # grokbot-telegram dispatcher (bot | user | login)
+├── dist/                       # published bundles, built (gitignored)
 ├── packages/mcp-server/        # Bot API MCP + dist bundle
 ├── packages/mcp-user-server/   # GramJS user MCP + dist bundle
 ├── LICENSE

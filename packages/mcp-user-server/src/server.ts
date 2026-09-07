@@ -7,10 +7,11 @@ import {
   writeSessionString,
 } from "./credentials.js";
 import { filterDialogs } from "./dialogs.js";
+import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
 import { isPasswordNeeded, type TelegramUserClient } from "./types.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const SESSION_WARNING =
   "This session string is full access to the personal Telegram account. Save it in Plugins → Configure as TELEGRAM_SESSION (or keep the session file). Never commit it. Treat it like a password.";
@@ -479,7 +480,7 @@ export function createTelegramUserMcpServer(
     {
       title: "Send as the logged-in user",
       description:
-        "[User account] Send a text message as the personal Telegram account (not a bot). Confirm destination and text with the user first.",
+        "[User account] Send a text message as the personal Telegram account (not a bot). Confirm destination and text with the user first. A disclaimer footer is appended to every message unless TELEGRAM_DISCLAIMER is off, and it counts against Telegram's 4096-character limit.",
       inputSchema: z.object({
         chat: z
           .string()
@@ -502,10 +503,12 @@ export function createTelegramUserMcpServer(
             new Error("Not logged in. Complete user-account login before sending."),
           );
         }
-        const result = await active.sendMessage(chat, text);
+        const sentText = applyDisclaimer(text);
+        const result = await active.sendMessage(chat, sentText);
         return jsonResult({
           ...result,
           identity: "user-account",
+          disclaimer: disclaimerText(),
         });
       } catch (err) {
         return errorResult(err);

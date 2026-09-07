@@ -7,6 +7,7 @@ const TOKEN = "123456789:AAHfakeTokenValueForTestsOnly1234567";
 
 afterEach(() => {
   delete process.env.TELEGRAM_BOT_TOKEN;
+  delete process.env.TELEGRAM_DISCLAIMER;
 });
 
 async function connectClient() {
@@ -63,7 +64,10 @@ describe("telegram MCP server", () => {
         text: string;
       };
       assert.equal(body.chat_id, 99);
-      assert.equal(body.text, "hello from test");
+      assert.equal(
+        body.text,
+        "hello from test\n\n— This message was sent by Grok Bot.",
+      );
       return new Response(
         JSON.stringify({
           ok: true,
