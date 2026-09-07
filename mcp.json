@@ -1,15 +1,15 @@
 {
   "mcpServers": {
     "telegram-bot": {
-      "command": "node",
-      "args": ["${PLUGIN_ROOT}/packages/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "cursor-telegram-bot-mcp"],
       "env": {
         "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}"
       }
     },
     "telegram-user": {
-      "command": "node",
-      "args": ["${PLUGIN_ROOT}/packages/mcp-user-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "cursor-telegram-user-mcp"],
       "env": {
         "TELEGRAM_API_ID": "${TELEGRAM_API_ID}",
         "TELEGRAM_API_HASH": "${TELEGRAM_API_HASH}",

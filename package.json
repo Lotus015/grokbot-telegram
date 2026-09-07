@@ -1,13 +1,20 @@
 {
   "name": "cursor-telegram-plugin",
   "private": true,
-  "description": "Cursor plugin: Telegram Bot API + MTProto user-account MCP",
+  "version": "0.3.0",
+  "description": "Cursor plugin: Telegram Bot API + MTProto user-account MCP (npx-installable)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lotus015/cursor-telegram-plugin.git"
+  },
   "scripts": {
     "build": "npm run build --prefix packages/mcp-server && npm run build --prefix packages/mcp-user-server",
     "test": "npm test --prefix packages/mcp-server && npm test --prefix packages/mcp-user-server",
     "typecheck": "npm run typecheck --prefix packages/mcp-server && npm run typecheck --prefix packages/mcp-user-server",
-    "validate": "node scripts/validate-plugin.mjs"
+    "validate": "node scripts/validate-plugin.mjs",
+    "publish:bot": "npm publish --prefix packages/mcp-server --access public",
+    "publish:user": "npm publish --prefix packages/mcp-user-server --access public"
   },
   "engines": {
     "node": ">=20"

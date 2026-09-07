@@ -12,3 +12,4 @@ coverage/
 *.session-journal
 .telegram-session
 .cursor-telegram-plugin/
+*.tgz

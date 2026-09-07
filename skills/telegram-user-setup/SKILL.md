@@ -11,6 +11,8 @@ This path logs in as the **user's real Telegram account** via [teleproto](https:
 
 This plugin does **not** require `TELEGRAM_BOT_TOKEN` for user-account mode.
 
+Install: Cursor Marketplace / local plugin / [cursor.directory](https://cursor.directory), or tell Grok Bot “install Telegram”. Fallback: `AddMcpServer` with `npx -y cursor-telegram-user-mcp`. Telegram still requires api_id / api_hash and a one-time login; we cannot skip that.
+
 ## What the user must provide (first run)
 
 1. **`TELEGRAM_API_ID`** and **`TELEGRAM_API_HASH`** from [my.telegram.org/apps](https://my.telegram.org/apps) (Telegram login, then **API development tools** → create an app).
@@ -59,7 +61,8 @@ Paste it only into **Plugins → Configure → TELEGRAM_SESSION**. Then `auth_st
 ```bash
 export TELEGRAM_API_ID="…"
 export TELEGRAM_API_HASH="…"
-node packages/mcp-user-server/dist/login.js
+npx -y -p cursor-telegram-user-mcp telegram-user-login
+# from a clone: node packages/mcp-user-server/dist/login.js
 ```
 
 The CLI writes `~/.cursor-telegram-plugin/user.session` (`0600`) and prints the session string once.
