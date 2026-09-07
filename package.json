@@ -1,12 +1,12 @@
 {
   "name": "cursor-telegram-plugin",
   "private": true,
-  "description": "Cursor plugin: Telegram Bot API MCP",
+  "description": "Cursor plugin: Telegram Bot API + MTProto user-account MCP",
   "license": "MIT",
   "scripts": {
-    "build": "npm run build --prefix packages/mcp-server",
-    "test": "npm test --prefix packages/mcp-server",
-    "typecheck": "npm run typecheck --prefix packages/mcp-server",
+    "build": "npm run build --prefix packages/mcp-server && npm run build --prefix packages/mcp-user-server",
+    "test": "npm test --prefix packages/mcp-server && npm test --prefix packages/mcp-user-server",
+    "typecheck": "npm run typecheck --prefix packages/mcp-server && npm run typecheck --prefix packages/mcp-user-server",
     "validate": "node scripts/validate-plugin.mjs"
   },
   "engines": {

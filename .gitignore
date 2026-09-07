@@ -8,3 +8,7 @@ node_modules/
 coverage/
 .idea/
 .vscode/
+*.session
+*.session-journal
+.telegram-session
+.cursor-telegram-plugin/

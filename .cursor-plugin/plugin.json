@@ -1,8 +1,8 @@
 {
   "name": "telegram-bot",
-  "displayName": "Telegram Bot",
-  "version": "0.1.0",
-  "description": "Send Telegram messages and run related Bot API actions from Cursor via a local MCP server. Uses the official Telegram Bot API (not a userbot).",
+  "displayName": "Telegram",
+  "version": "0.2.0",
+  "description": "Telegram from Cursor in two modes: Bot API (messages as your @bot) and MTProto user account (messages as you). Configure one or both.",
   "author": {
     "name": "Lotus / Lotus015"
   },
@@ -15,6 +15,8 @@
     "bot",
     "mcp",
     "bot-api",
+    "mtproto",
+    "user-account",
     "notifications"
   ],
   "logo": "assets/logo.svg",
@@ -23,10 +25,24 @@
     "properties": {
       "TELEGRAM_BOT_TOKEN": {
         "type": "string",
-        "title": "Telegram bot token",
-        "description": "Bot token from @BotFather (Plugins → Configure). Never commit this value. Format: 123456789:AAH..."
+        "title": "Telegram bot token (Bot API mode)",
+        "description": "Bot token from @BotFather. Required only for the telegram-bot MCP server. Never commit this value. Format: 123456789:AAH..."
+      },
+      "TELEGRAM_API_ID": {
+        "type": "string",
+        "title": "Telegram api_id (user-account mode)",
+        "description": "App api_id from https://my.telegram.org/apps. Required for the telegram-user MTProto server. Numeric string, e.g. 123456."
+      },
+      "TELEGRAM_API_HASH": {
+        "type": "string",
+        "title": "Telegram api_hash (user-account mode)",
+        "description": "App api_hash from https://my.telegram.org/apps. Required for the telegram-user MTProto server. Treat as a secret."
+      },
+      "TELEGRAM_SESSION": {
+        "type": "string",
+        "title": "Telegram session string (user-account mode)",
+        "description": "teleproto/GramJS/Telethon-style StringSession after first login. Optional if a session file already exists. Equivalent to a password for your personal Telegram account — never commit it."
       }
-    },
-    "required": ["TELEGRAM_BOT_TOKEN"]
+    }
   }
 }
