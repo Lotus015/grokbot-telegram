@@ -1,0 +1,32 @@
+{
+  "name": "telegram-bot",
+  "displayName": "Telegram Bot",
+  "version": "0.1.0",
+  "description": "Send Telegram messages and run related Bot API actions from Cursor via a local MCP server. Uses the official Telegram Bot API (not a userbot).",
+  "author": {
+    "name": "Lotus / Lotus015"
+  },
+  "homepage": "https://github.com/Lotus015/cursor-telegram-plugin",
+  "repository": "https://github.com/Lotus015/cursor-telegram-plugin",
+  "license": "MIT",
+  "keywords": [
+    "telegram",
+    "messaging",
+    "bot",
+    "mcp",
+    "bot-api",
+    "notifications"
+  ],
+  "logo": "assets/logo.svg",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "TELEGRAM_BOT_TOKEN": {
+        "type": "string",
+        "title": "Telegram bot token",
+        "description": "Bot token from @BotFather (Plugins → Configure). Never commit this value. Format: 123456789:AAH..."
+      }
+    },
+    "required": ["TELEGRAM_BOT_TOKEN"]
+  }
+}

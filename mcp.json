@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "telegram-bot": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/packages/mcp-server/dist/index.js"],
+      "env": {
+        "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}"
+      }
+    }
+  }
+}
