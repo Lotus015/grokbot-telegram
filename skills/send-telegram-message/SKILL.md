@@ -1,16 +1,16 @@
 ---
 name: send-telegram-message
-description: Send or post a Telegram message with the installed Telegram Bot MCP. Use when the user asks to send, post, or deliver a Telegram message, notification, or Bot API sendMessage.
+description: Send or post a Telegram message as the BotFather bot (Bot API). Use when the user asks to send via the bot, a notification bot, or Bot API sendMessage — not when they want to send as themselves.
 ---
 
-# Send a Telegram message
+# Send a Telegram message as the bot
 
-Use this skill whenever the user wants a Telegram message sent through the **telegram-bot** MCP server (official Bot API, not a user account).
+Use this skill when the user wants a Telegram message sent through the **telegram-bot** MCP server (official Bot API). If they want the message to appear **as their personal account**, use `send-telegram-user-message` instead.
 
 ## Before you send
 
-1. Confirm the plugin is configured. If tools fail with a missing-token error, point the user at Plugins → Configure and the `telegram-bot-setup` skill. Never ask them to paste the token into chat.
-2. Resolve the destination **before** calling `send_message`.
+1. Confirm Bot API mode is configured. If tools fail with a missing-token error, point the user at Plugins → Configure and the `telegram-bot-setup` skill. Never ask them to paste the token into chat.
+2. Resolve the destination **before** calling `telegram-bot` `send_message`.
 3. Show the user the exact `chat_id` (or `@username`) and the exact message text. Wait for explicit confirmation before sending anything consequential (anything that leaves this machine: real chats, groups, channels, production alerts).
 4. Never print, log, or quote `TELEGRAM_BOT_TOKEN`. If a tool error includes a URL or token-shaped string, redact it.
 
@@ -29,13 +29,13 @@ Prefer the most specific identifier the user already gave, in this order:
 
 If the destination is unclear:
 
-1. Call `get_me` to verify the bot is reachable.
+1. Call `telegram-bot` `get_me` to verify the bot is reachable.
 2. Call `list_recent_chats` (and `get_updates` if you need more context).
 3. If the target is still missing, tell the user to open a DM with the bot, tap **Start**, then retry.
 
 ## Sending
 
-Call MCP tool `send_message` with:
+Call MCP tool `send_message` on **telegram-bot** with:
 
 - `chat_id` (string or number): numeric id or `@username` for a public channel/group
 - `text`: the message body

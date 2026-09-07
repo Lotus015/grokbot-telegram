@@ -1,11 +1,12 @@
 {
-  "name": "telegram-bot-mcp-server",
+  "name": "telegram-user-mcp-server",
   "version": "0.2.0",
   "private": true,
-  "description": "Stdio MCP server wrapping the Telegram Bot API for the telegram-bot Cursor plugin.",
+  "description": "Stdio MCP server wrapping teleproto (maintained GramJS fork) for personal Telegram account MTProto access.",
   "type": "module",
   "bin": {
-    "telegram-bot-mcp": "./dist/index.js"
+    "telegram-user-mcp": "./dist/index.js",
+    "telegram-user-login": "./dist/login.js"
   },
   "files": [
     "dist",
@@ -15,13 +16,15 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --minify --outfile=dist/index.js --legal-comments=eof",
+    "build": "node ../../scripts/esbuild-user-server.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "login": "node dist/login.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
+    "teleproto": "^1.228.5",
     "zod": "^4.0.0"
   },
   "devDependencies": {

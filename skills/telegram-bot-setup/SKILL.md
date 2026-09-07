@@ -1,11 +1,11 @@
 ---
 name: telegram-bot-setup
-description: Create a Telegram bot with @BotFather, configure TELEGRAM_BOT_TOKEN in Cursor Plugins, and smoke-test sendMessage. Use when installing this plugin, when the token is missing, or when the bot cannot send.
+description: Create a Telegram bot with @BotFather, configure TELEGRAM_BOT_TOKEN in Cursor Plugins, and smoke-test sendMessage. Use when installing Bot API mode, when the token is missing, or when the bot cannot send.
 ---
 
-# Set up the Telegram Bot plugin
+# Set up Telegram Bot API mode
 
-Walk the user through creating a bot, storing the token in Cursor (not in git), and proving `sendMessage` works.
+Walk the user through creating a **bot**, storing the token in Cursor (not in git), and proving `sendMessage` works. This is **not** personal-account login. For “send as me”, use `telegram-user-setup`.
 
 ## 1. Create a bot with BotFather
 
@@ -20,13 +20,13 @@ Optional: `/setprivacy` (disable privacy mode if the bot should read all group m
 ## 2. Put the token in Cursor — not in the repo
 
 1. Install this plugin (Marketplace, [cursor.directory](https://cursor.directory), or a local clone).
-2. Open **Plugins → Configure** for **telegram-bot**.
-3. Set `TELEGRAM_BOT_TOKEN` to the BotFather token.
-4. Reload the window if the MCP server does not start.
+2. Open **Plugins → Configure** for this plugin.
+3. Set `TELEGRAM_BOT_TOKEN` to the BotFather token. Leave `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` empty unless they also want user-account mode.
+4. Reload the window if the `telegram-bot` MCP server does not start.
 
 Never commit the token, never paste it into chat, and never put it in `mcp.json`. The plugin only ships a `${TELEGRAM_BOT_TOKEN}` placeholder.
 
-Hand-running the server (development):
+Hand-running the bot server (development):
 
 ```bash
 cp .env.example .env   # then edit locally; .env is gitignored
@@ -40,7 +40,7 @@ The user must message the bot at least once in a DM (`/start`). Bots cannot star
 
 Then, in Cursor Agent chat:
 
-1. Ask: “Call `get_me` and tell me the bot username (do not print the token).”
+1. Ask: “Call `telegram-bot` `get_me` and tell me the bot username (do not print the token).”
 2. Ask the user to send any text to the bot in Telegram.
 3. Ask: “List recent chats the bot can see, then send ‘hello from Cursor’ to my DM after I confirm.”
 4. Confirm destination + text, then send.
@@ -71,4 +71,4 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 | `getUpdates` conflict | A webhook is set on this bot; delete it or do not use polling tools |
 | Empty `list_recent_chats` | No recent updates. User should `/start` or send a message, then retry |
 
-This plugin uses the **HTTP Bot API only**. It cannot log into a personal Telegram account, read arbitrary dialogs, or act as a userbot (MTProto).
+This is **HTTP Bot API only**. Messages are sent **as the bot**, not as the user's personal account. User-account / MTProto setup is a separate path (`telegram-user-setup`).

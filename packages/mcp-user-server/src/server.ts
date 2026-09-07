@@ -1,0 +1,517 @@
+import { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+import { createGramJsUserClient, qrUrl } from "./client.js";
+import {
+  getUserApiCredentials,
+  sessionSource,
+  writeSessionString,
+} from "./credentials.js";
+import { filterDialogs } from "./dialogs.js";
+import { safeErrorMessage } from "./redact.js";
+import { isPasswordNeeded, type TelegramUserClient } from "./types.js";
+
+const VERSION = "0.2.0";
+
+const SESSION_WARNING =
+  "This session string is full access to the personal Telegram account. Save it in Plugins → Configure as TELEGRAM_SESSION (or keep the session file). Never commit it. Treat it like a password.";
+
+function jsonResult(value: unknown) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  };
+}
+
+function errorResult(err: unknown) {
+  return {
+    isError: true as const,
+    content: [{ type: "text" as const, text: safeErrorMessage(err) }],
+  };
+}
+
+type PendingPhone = {
+  phone: string;
+  phoneCodeHash: string;
+  isCodeViaApp: boolean;
+};
+
+export type UserServerOptions = {
+  createClient?: () => TelegramUserClient;
+};
+
+export function createTelegramUserMcpServer(
+  options: UserServerOptions = {},
+): McpServer {
+  const server = new McpServer({
+    name: "telegram-user",
+    version: VERSION,
+  });
+
+  const createClient = options.createClient ?? createGramJsUserClient;
+  let client: TelegramUserClient | undefined;
+  let pendingPhone: PendingPhone | undefined;
+  let qrUnsubscribe: (() => void) | undefined;
+  let qrScanned: { promise: Promise<void>; resolve: () => void } | undefined;
+
+  async function getClient(): Promise<TelegramUserClient> {
+    getUserApiCredentials();
+    if (!client) client = createClient();
+    await client.connect();
+    return client;
+  }
+
+  function persist(active: TelegramUserClient): {
+    session: string;
+    session_file: string;
+  } {
+    const session = active.exportSession();
+    const session_file = writeSessionString(session);
+    return { session, session_file };
+  }
+
+  async function finishQr(active: TelegramUserClient, password?: string) {
+    let token = await active.exportLoginToken();
+    if (token.kind === "migrate") {
+      await active.switchDc(token.dcId);
+      token = await active.importLoginToken(token.token);
+    }
+    if (token.kind === "success") {
+      const saved = persist(active);
+      return {
+        ok: true,
+        me: token.user,
+        ...saved,
+        warning: SESSION_WARNING,
+      };
+    }
+    if (password) {
+      const me = await active.signInWithPassword(password);
+      const saved = persist(active);
+      return { ok: true, me, ...saved, warning: SESSION_WARNING };
+    }
+    return {
+      ok: false,
+      waiting: true,
+      note: "QR not completed yet. Scan in Telegram (Settings → Devices → Link Desktop Device), then call complete_qr_login again. If 2FA is enabled, pass password.",
+    };
+  }
+
+  server.registerTool(
+    "auth_status",
+    {
+      title: "User-account auth status",
+      description:
+        "[User account] Check whether TELEGRAM_API_ID / TELEGRAM_API_HASH / session are configured and whether the MTProto session is authorized. Does not use TELEGRAM_BOT_TOKEN.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async () => {
+      try {
+        try {
+          getUserApiCredentials();
+        } catch (err) {
+          return jsonResult({
+            configured: false,
+            authorized: false,
+            session_source: sessionSource(),
+            error: safeErrorMessage(err),
+          });
+        }
+        const active = await getClient();
+        const authorized = await active.isAuthorized();
+        return jsonResult({
+          configured: true,
+          authorized,
+          session_source: sessionSource(),
+          me: authorized ? await active.getMe() : undefined,
+          pending_phone_login: Boolean(pendingPhone),
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "start_login",
+    {
+      title: "Start phone login",
+      description:
+        "[User account] Send a Telegram login code to the user's phone. Then call complete_login with the code (and 2FA password if needed).",
+      inputSchema: z.object({
+        phone: z
+          .string()
+          .min(6)
+          .describe("Phone number in international format, e.g. +15551234567."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ phone }) => {
+      try {
+        const active = await getClient();
+        if (await active.isAuthorized()) {
+          return jsonResult({
+            already_authorized: true,
+            me: await active.getMe(),
+          });
+        }
+        const result = await active.sendCode(phone.trim());
+        pendingPhone = {
+          phone: phone.trim(),
+          phoneCodeHash: result.phoneCodeHash,
+          isCodeViaApp: result.isCodeViaApp,
+        };
+        return jsonResult({
+          ok: true,
+          phone: pendingPhone.phone,
+          is_code_via_app: result.isCodeViaApp,
+          next: "Ask the user for the login code, then call complete_login. Do not echo api_hash or session.",
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "complete_login",
+    {
+      title: "Complete phone login",
+      description:
+        "[User account] Submit the login code (and optional 2FA cloud password) after start_login. Returns a session string — full account access; save as TELEGRAM_SESSION.",
+      inputSchema: z.object({
+        code: z.string().min(1).describe("Login code from Telegram or SMS."),
+        password: z
+          .string()
+          .optional()
+          .describe("2FA cloud password if the account has two-step verification."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ code, password }) => {
+      try {
+        if (!pendingPhone) {
+          return errorResult(
+            new Error("No pending phone login. Call start_login with the phone number first."),
+          );
+        }
+        const active = await getClient();
+        let me;
+        try {
+          me = await active.signIn(
+            pendingPhone.phone,
+            pendingPhone.phoneCodeHash,
+            code.trim(),
+          );
+        } catch (err) {
+          if (isPasswordNeeded(err)) {
+            if (!password) {
+              return errorResult(
+                new Error(
+                  "SESSION_PASSWORD_NEEDED. This account has two-step verification. Call complete_login again with password.",
+                ),
+              );
+            }
+            me = await active.signInWithPassword(password);
+          } else {
+            throw err;
+          }
+        }
+        pendingPhone = undefined;
+        const saved = persist(active);
+        return jsonResult({
+          ok: true,
+          me,
+          ...saved,
+          warning: SESSION_WARNING,
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "start_qr_login",
+    {
+      title: "Start QR login",
+      description:
+        "[User account] Begin QR / Link Desktop Device login. Show login_url to the user, then call complete_qr_login after they scan.",
+      inputSchema: z.object({}),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async () => {
+      try {
+        const active = await getClient();
+        if (await active.isAuthorized()) {
+          return jsonResult({
+            already_authorized: true,
+            me: await active.getMe(),
+          });
+        }
+        qrUnsubscribe?.();
+        let resolve = () => {};
+        const promise = new Promise<void>((res) => {
+          resolve = res;
+        });
+        qrScanned = { promise, resolve };
+        qrUnsubscribe = active.onLoginToken(() => qrScanned?.resolve());
+        const token = await active.exportLoginToken();
+        if (token.kind === "success") {
+          const saved = persist(active);
+          return jsonResult({
+            ok: true,
+            already_authorized: true,
+            me: token.user,
+            ...saved,
+            warning: SESSION_WARNING,
+          });
+        }
+        if (token.kind !== "token") {
+          return errorResult(new Error("Could not export a QR login token."));
+        }
+        return jsonResult({
+          ok: true,
+          login_url: qrUrl(token.token),
+          expires: token.expires,
+          how: "Open Telegram → Settings → Devices → Link Desktop Device, then scan or open login_url. After scanning, call complete_qr_login.",
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "complete_qr_login",
+    {
+      title: "Complete QR login",
+      description:
+        "[User account] Finish QR login after the user scans. Pass password if 2FA is enabled. Returns a session string — full account access.",
+      inputSchema: z.object({
+        password: z
+          .string()
+          .optional()
+          .describe("2FA cloud password if two-step verification is enabled."),
+        wait_ms: z
+          .number()
+          .int()
+          .min(0)
+          .max(120000)
+          .optional()
+          .describe("Optional time to wait for the scan event (default 15000)."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ password, wait_ms }) => {
+      try {
+        const active = await getClient();
+        if (qrScanned) {
+          const wait = wait_ms ?? 15_000;
+          await Promise.race([
+            qrScanned.promise,
+            new Promise((resolve) => setTimeout(resolve, wait)),
+          ]);
+        }
+        try {
+          return jsonResult(await finishQr(active, password));
+        } catch (err) {
+          if (isPasswordNeeded(err)) {
+            if (!password) {
+              return errorResult(
+                new Error(
+                  "SESSION_PASSWORD_NEEDED. Call complete_qr_login again with password.",
+                ),
+              );
+            }
+            const me = await active.signInWithPassword(password);
+            const saved = persist(active);
+            return jsonResult({
+              ok: true,
+              me,
+              ...saved,
+              warning: SESSION_WARNING,
+            });
+          }
+          throw err;
+        }
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_me",
+    {
+      title: "Get logged-in user",
+      description:
+        "[User account] Return the authorized personal Telegram user (not a bot). Use to verify the MTProto session.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async () => {
+      try {
+        const active = await getClient();
+        if (!(await active.isAuthorized())) {
+          return errorResult(
+            new Error(
+              "Not logged in. Set TELEGRAM_SESSION or run start_login / start_qr_login. See the telegram-user-setup skill.",
+            ),
+          );
+        }
+        return jsonResult(await active.getMe());
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_dialogs",
+    {
+      title: "List dialogs",
+      description:
+        "[User account] List chats from the real Telegram dialog list (inbox), not Bot API getUpdates.",
+      inputSchema: z.object({
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Max dialogs to return (1–200). Default 50."),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ limit }) => {
+      try {
+        const active = await getClient();
+        const dialogs = await active.listDialogs(limit ?? 50);
+        return jsonResult({ dialogs, count: dialogs.length });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "search_dialogs",
+    {
+      title: "Search dialogs",
+      description:
+        "[User account] Search the dialog list by title, username, or id. Resolve chats here before send_message.",
+      inputSchema: z.object({
+        query: z.string().min(1).describe("Case-insensitive substring to match."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Max dialogs to scan (1–200). Default 100."),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ query, limit }) => {
+      try {
+        const active = await getClient();
+        const dialogs = filterDialogs(
+          await active.listDialogs(limit ?? 100),
+          query,
+        );
+        return jsonResult({ query, dialogs, count: dialogs.length });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_messages",
+    {
+      title: "Get recent messages",
+      description:
+        "[User account] Fetch recent history for a chat (id, @username, or me).",
+      inputSchema: z.object({
+        chat: z
+          .string()
+          .min(1)
+          .describe("Chat id, @username, or me (Saved Messages)."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Max messages (1–100). Default 20."),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ chat, limit }) => {
+      try {
+        const active = await getClient();
+        const messages = await active.getMessages(chat, limit ?? 20);
+        return jsonResult({ chat, messages, count: messages.length });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "send_message",
+    {
+      title: "Send as the logged-in user",
+      description:
+        "[User account] Send a text message as the personal Telegram account (not a bot). Confirm destination and text with the user first.",
+      inputSchema: z.object({
+        chat: z
+          .string()
+          .min(1)
+          .describe("Destination: me, @username, or a dialog id from list_dialogs."),
+        text: z.string().min(1).max(4096).describe("Message text to send."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ chat, text }) => {
+      try {
+        const active = await getClient();
+        if (!(await active.isAuthorized())) {
+          return errorResult(
+            new Error("Not logged in. Complete user-account login before sending."),
+          );
+        }
+        const result = await active.sendMessage(chat, text);
+        return jsonResult({
+          ...result,
+          identity: "user-account",
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  return server;
+}

@@ -4,7 +4,7 @@ import { chatsFromUpdates, type TelegramUpdate } from "./chats.js";
 import { safeErrorMessage } from "./redact.js";
 import { getMe, getUpdates, sendMessage } from "./telegram.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 function jsonResult(value: unknown) {
   return {
@@ -42,7 +42,7 @@ export function createTelegramMcpServer(): McpServer {
     {
       title: "Get bot identity",
       description:
-        "Call Telegram getMe. Returns the bot id, name, and username. Use to verify TELEGRAM_BOT_TOKEN works. Never log the token.",
+        "[Bot API] Call Telegram getMe. Returns the bot id, name, and username. Use to verify TELEGRAM_BOT_TOKEN works. Never log the token. For the personal account, use the telegram-user MCP server instead.",
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
@@ -60,7 +60,7 @@ export function createTelegramMcpServer(): McpServer {
     {
       title: "Send Telegram message",
       description:
-        "Call Telegram sendMessage. Confirm destination and text with the user before sending consequential messages. chat_id may be a number or @username for a public channel/group.",
+        "[Bot API] Send as the bot via sendMessage (not the user's personal account). Confirm destination and text before sending consequential messages. chat_id may be a number or @username for a public channel/group.",
       inputSchema: z.object({
         chat_id: chatIdSchema,
         text: z.string().min(1).max(4096).describe("Message text to send."),
@@ -91,7 +91,7 @@ export function createTelegramMcpServer(): McpServer {
     {
       title: "Get Telegram updates",
       description:
-        "Call Telegram getUpdates (long-poll/debug). Omit offset to peek without acknowledging. Passing offset greater than an update_id confirms (consumes) those updates. Fails if a webhook is set.",
+        "[Bot API] Call Telegram getUpdates (long-poll/debug). Omit offset to peek without acknowledging. Passing offset greater than an update_id confirms (consumes) those updates. Fails if a webhook is set.",
       inputSchema: z.object({
         offset: z
           .number()
@@ -144,7 +144,7 @@ export function createTelegramMcpServer(): McpServer {
     {
       title: "List recent chats from updates",
       description:
-        "Best-effort chat list derived from getUpdates. Bot API cannot enumerate every chat a bot is in; this only shows chats that recently produced updates. Users must /start the bot in DMs first.",
+        "[Bot API] Best-effort chat list derived from getUpdates. Bot API cannot enumerate every chat a bot is in. For the real dialog list, use telegram-user list_dialogs. Private users must /start the bot in DMs first.",
       inputSchema: z.object({
         limit: z
           .number()
