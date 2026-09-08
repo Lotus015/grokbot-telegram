@@ -14,6 +14,7 @@ import {
   type PendingPhone,
 } from "./pending-login.js";
 import { filterDialogs } from "./dialogs.js";
+import { qrPngBase64 } from "./qr.js";
 import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
 import {
@@ -26,6 +27,26 @@ const VERSION = "0.3.1";
 
 const SESSION_WARNING =
   "This session string is full access to the personal Telegram account. Save it in Plugins → Configure as TELEGRAM_SESSION (or keep the session file). Never commit it. Treat it like a password.";
+
+// The QR image goes first so a chat host paints it immediately; the JSON that
+// follows carries login_url as the fallback for hosts that show no images.
+async function qrResult(loginUrl: string, payload: Record<string, unknown>) {
+  const content: (
+    | { type: "image"; data: string; mimeType: string }
+    | { type: "text"; text: string }
+  )[] = [];
+  try {
+    content.push({
+      type: "image",
+      data: await qrPngBase64(loginUrl),
+      mimeType: "image/png",
+    });
+  } catch {
+    // Rendering must never cost the user their login; the link still works.
+  }
+  content.push({ type: "text", text: JSON.stringify(payload, null, 2) });
+  return { content };
+}
 
 function jsonResult(value: unknown) {
   return {
@@ -118,7 +139,12 @@ export function createTelegramUserMcpServer(
   }
 
   const QR_DELIVERY =
-    "Send login_url to the user as the whole message, on its own, before any commentary — the code dies in seconds and anything ahead of it eats the window. Telegram → Settings → Devices → Link Desktop Device.";
+    "The scannable QR image is attached to this result — forward it to the user immediately, on its own, before any commentary. Do not render your own image and do not send login_url instead: the code dies in seconds, and anything ahead of it eats the window. login_url is only a fallback for a client that cannot show images. The user scans it in Telegram → Settings → Devices → Link Desktop Device.";
+
+  async function loginResult(payload: Record<string, unknown>) {
+    const url = payload.login_url;
+    return typeof url === "string" ? qrResult(url, payload) : jsonResult(payload);
+  }
 
   async function finishQr(active: TelegramUserClient, password?: string) {
     let token = await active.exportLoginToken();
@@ -361,7 +387,7 @@ export function createTelegramUserMcpServer(
           return errorResult(new Error("Could not export a QR login token."));
         }
         rememberPendingLogin(active, "qr");
-        return jsonResult({
+        return await loginResult({
           ok: true,
           login_url: qrUrl(token.token),
           expires: token.expires,
@@ -423,7 +449,7 @@ export function createTelegramUserMcpServer(
           ]);
         }
         try {
-          return jsonResult(await finishQr(active, password));
+          return await loginResult(await finishQr(active, password));
         } catch (err) {
           if (isPasswordNeeded(err)) {
             if (!password) {

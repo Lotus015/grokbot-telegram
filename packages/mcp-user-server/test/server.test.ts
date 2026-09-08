@@ -230,9 +230,12 @@ describe("telegram user MCP server", () => {
         name: "start_qr_login",
         arguments: {},
       });
-      const text = (start.content[0] as { text: string }).text;
+      // The scannable image leads the result now, so read the text block.
+      const content = start.content as { type: string; text?: string }[];
+      const text = content.find((c) => c.type === "text")?.text ?? "";
       assert.equal(start.isError ?? false, false, text);
       assert.match(text, /tg:\/\/login\?token=/);
+      assert.equal(content[0]?.type, "image");
     } finally {
       await client.close();
       await server.close();

@@ -86,16 +86,24 @@ function resumingProcess(): { dir: string; sessionPath: string } {
   return { dir, sessionPath };
 }
 
+type Content = { type: string; text?: string; data?: string; mimeType?: string };
+
+function textOf(content: Content[]): string {
+  const block = content.find((c) => c.type === "text");
+  assert.ok(block?.text, `no text block in ${JSON.stringify(content.map((c) => c.type))}`);
+  return block.text;
+}
+
 async function callComplete(client: TelegramUserClient) {
   const { mcp, server } = await connect(client);
   const result = await mcp.callTool({
     name: "complete_qr_login",
     arguments: { wait_ms: 0 },
   });
-  const text = (result.content[0] as { text: string }).text;
+  const content = result.content as Content[];
   await mcp.close();
   await server.close();
-  return { isError: result.isError ?? false, text };
+  return { isError: result.isError ?? false, text: textOf(content), content };
 }
 
 describe("QR login resumed in another process", () => {
@@ -216,6 +224,57 @@ describe("QR login resumed in another process", () => {
       const parsed = JSON.parse(text) as { login_url?: string; expires?: number };
       assert.ok(parsed.login_url, `no login_url in ${text}`);
       assert.equal(parsed.expires, 42);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("QR arrives as a scannable image", () => {
+  it("leads the result with a PNG the user can point a camera at", async () => {
+    const { dir } = resumingProcess();
+    try {
+      const { content } = await callComplete(
+        qrClient(
+          {
+            authorized: false,
+            tokens: [{ kind: "token", token: Buffer.from("scan-me"), expires: 99 }],
+          },
+          { exports: 0, imports: 0 },
+        ),
+      );
+
+      // First, so a chat host paints it before anything else in the reply.
+      const first = content[0];
+      assert.equal(first?.type, "image");
+      assert.equal(first?.mimeType, "image/png");
+
+      const png = Buffer.from(first?.data ?? "", "base64");
+      assert.ok(png.length > 100, `PNG too small: ${png.length} bytes`);
+      assert.deepEqual(
+        [...png.subarray(0, 4)],
+        [0x89, 0x50, 0x4e, 0x47],
+        "not a PNG signature",
+      );
+
+      // The link still travels as a fallback for hosts that show no images.
+      const parsed = JSON.parse(textOf(content)) as { login_url: string };
+      assert.match(parsed.login_url, /^tg:\/\/login\?token=/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still returns the login when the image cannot be built", async () => {
+    const { dir } = resumingProcess();
+    try {
+      // An adopted session has no QR to draw; the result must stay well formed.
+      const { isError, content } = await callComplete(
+        qrClient({ authorized: true }, { exports: 0, imports: 0 }),
+      );
+      assert.equal(isError, false);
+      assert.equal(content.some((c) => c.type === "image"), false);
+      assert.equal((JSON.parse(textOf(content)) as { ok: boolean }).ok, true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
