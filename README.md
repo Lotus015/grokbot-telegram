@@ -1,7 +1,7 @@
 # Telegram for Cursor
 
 [![npm](https://img.shields.io/npm/v/grokbot-telegram.svg)](https://www.npmjs.com/package/grokbot-telegram)
-[![CI](https://github.com/Lotus015/grokbot-telegram/actions/workflows/ci.yml/badge.svg)](https://github.com/Lotus015/grokbot-telegram/actions/workflows/ci.yml)
+[![CI](https://github.com/jigjoy-ai/grokbot-telegram/actions/workflows/ci.yml/badge.svg)](https://github.com/jigjoy-ai/grokbot-telegram/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grokbot-telegram.svg)](LICENSE)
 
 Installable [Cursor plugin](https://cursor.com/docs/plugins) with **two** first-party MCP servers:

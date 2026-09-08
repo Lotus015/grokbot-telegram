@@ -5,13 +5,13 @@
   "license": "MIT",
   "type": "module",
   "author": "Lotus015",
-  "homepage": "https://github.com/Lotus015/grokbot-telegram#readme",
+  "homepage": "https://github.com/jigjoy-ai/grokbot-telegram#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lotus015/grokbot-telegram.git"
+    "url": "git+https://github.com/jigjoy-ai/grokbot-telegram.git"
   },
   "bugs": {
-    "url": "https://github.com/Lotus015/grokbot-telegram/issues"
+    "url": "https://github.com/jigjoy-ai/grokbot-telegram/issues"
   },
   "keywords": [
     "telegram",
