@@ -221,3 +221,71 @@ describe("send_message destination handling", () => {
     assert.deepEqual(seen.targets, ["-5532867099"]);
   });
 });
+
+describe("get_messages destination handling", () => {
+  it("reports what a title resolved to, the same way send_message does", async () => {
+    const seen = { targets: [] as string[], dialogCalls: 0 };
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createTelegramUserMcpServer({
+      createClient: () => ({
+        connect: async () => {},
+        disconnect: async () => {},
+        isAuthorized: async () => true,
+        getMe: async () => ({ id: "1", isBot: false }),
+        listDialogs: async () => {
+          seen.dialogCalls += 1;
+          return [
+            { id: "-5532867099", title: "Holandija 2026", type: "group" as const },
+          ];
+        },
+        getMessages: async (chat: string) => {
+          seen.targets.push(chat);
+          return [{ id: 1, text: "hi" }];
+        },
+        sendMessage: async (chat: string, text: string) => ({ id: 1, chatId: chat, text }),
+        sendCode: async () => ({ phoneCodeHash: "h", isCodeViaApp: true }),
+        signIn: async () => ({ id: "1", isBot: false }),
+        signInWithPassword: async () => ({ id: "1", isBot: false }),
+        exportLoginToken: async () => ({
+          kind: "token" as const,
+          token: Buffer.from("t"),
+          expires: 1,
+        }),
+        importLoginToken: async () => ({
+          kind: "success" as const,
+          user: { id: "1", isBot: false },
+        }),
+        switchDc: async () => {},
+        onLoginToken: () => () => {},
+        exportSession: () => "s",
+      }),
+    });
+    const mcp = new Client({ name: "test", version: "0.0.0" });
+    await Promise.all([
+      server.connect(serverTransport),
+      mcp.connect(clientTransport),
+    ]);
+
+    const result = await mcp.callTool({
+      name: "get_messages",
+      arguments: { chat: "Holandija 2026" },
+    });
+    const text = (result.content[0] as { text: string }).text;
+    assert.equal(result.isError ?? false, false, text);
+
+    // The title must not reach the client, and the caller must be told which
+    // chat it actually read — otherwise the two tools disagree about a
+    // destination the user named the same way.
+    assert.deepEqual(seen.targets, ["-5532867099"]);
+    const parsed = JSON.parse(text) as {
+      resolved_chat?: { id: string; title: string };
+    };
+    assert.deepEqual(parsed.resolved_chat, {
+      id: "-5532867099",
+      title: "Holandija 2026",
+    });
+
+    await mcp.close();
+    await server.close();
+  });
+});

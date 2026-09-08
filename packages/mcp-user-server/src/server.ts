@@ -691,9 +691,14 @@ export function createTelegramUserMcpServer(
     async ({ chat, limit }) => {
       try {
         const active = await getClient();
-        const { target } = await resolveDestination(active, chat);
+        const { target, resolved } = await resolveDestination(active, chat);
         const messages = await active.getMessages(target, limit ?? 20);
-        return jsonResult({ chat, messages, count: messages.length });
+        return jsonResult({
+          chat,
+          messages,
+          count: messages.length,
+          ...(resolved === undefined ? {} : { resolved_chat: resolved }),
+        });
       } catch (err) {
         return errorResult(err);
       }
