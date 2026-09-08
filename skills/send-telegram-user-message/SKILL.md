@@ -50,3 +50,16 @@ After success, report message id, destination title/id, and that it was sent **a
 Messages here go out **as the human account owner**, so the server appends `— sent by grokbot-telegram on my behalf` to every one of them unless `TELEGRAM_DISCLAIMER` is off. Do not write your own footer into `text` — you would get two.
 
 The footer counts against the 4096-character limit. If a send is refused for length, shorten the message or split it; do not disable the disclaimer to make room unless the user explicitly asks.
+
+## Naming the destination
+
+Send to an **id from `list_dialogs`** whenever you have one. That is the only form that goes straight out; everything else costs a lookup first.
+
+What each form does:
+
+- **id** (`-5532867099`, `777000`) or **`me`** — sent directly, no extra call.
+- **`@username`** — taken at face value, sent directly.
+- **a bare word** (`durov`) — ambiguous, since it could be a username or the name of one of their chats. Their own dialogs are checked first, because sending to a stranger who happens to hold that username is the worse mistake. Only if nothing matches is it treated as a username.
+- **a title** (`Holandija 2026`) — resolved against the dialog list. An exact title wins; an ambiguous one is refused with the candidates listed, and you must ask the user which they meant rather than picking one.
+
+A title that matches nothing fails immediately and says so. If you see that, call `list_dialogs`, confirm the chat with the user, and send to its id.

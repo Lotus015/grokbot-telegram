@@ -15,6 +15,11 @@ import {
   writePendingLogin,
   type PendingPhone,
 } from "./pending-login.js";
+import {
+  classifyDestination,
+  noSuchChatError,
+  resolveTitle,
+} from "./destination.js";
 import { filterDialogs } from "./dialogs.js";
 import { qrPngBase64 } from "./qr.js";
 import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
@@ -151,6 +156,26 @@ export function createTelegramUserMcpServer(
     const stored = readPendingLogin();
     if (stored === null) return;
     rememberPendingLogin(active, stored.kind, stored.phone);
+  }
+
+  // How many dialogs to scan when the caller named a chat by title. Deep
+  // enough for a real inbox, shallow enough to stay fast.
+  const TITLE_LOOKUP_LIMIT = 200;
+
+  async function resolveDestination(
+    active: TelegramUserClient,
+    chat: string,
+  ): Promise<{ target: string; resolved?: { id: string; title: string } }> {
+    const destination = classifyDestination(chat);
+    if (destination.kind === "direct") return { target: destination.target };
+
+    const dialogs = await active.listDialogs(TITLE_LOOKUP_LIMIT);
+    const match = resolveTitle(dialogs, destination.title);
+    if (match !== null) {
+      return { target: match.id, resolved: { id: match.id, title: match.title } };
+    }
+    if (destination.usernameFallback) return { target: destination.title };
+    throw noSuchChatError(destination.title);
   }
 
   async function loginResult(payload: Record<string, unknown>) {
@@ -647,7 +672,7 @@ export function createTelegramUserMcpServer(
     {
       title: "Get recent messages",
       description:
-        "[User account] Fetch recent history for a chat (id, @username, or me).",
+        "[User account] Fetch recent history for a chat. Prefer a dialog id from list_dialogs; a title is resolved against the dialog list first. @username and me also work.",
       inputSchema: z.object({
         chat: z
           .string()
@@ -666,7 +691,8 @@ export function createTelegramUserMcpServer(
     async ({ chat, limit }) => {
       try {
         const active = await getClient();
-        const messages = await active.getMessages(chat, limit ?? 20);
+        const { target } = await resolveDestination(active, chat);
+        const messages = await active.getMessages(target, limit ?? 20);
         return jsonResult({ chat, messages, count: messages.length });
       } catch (err) {
         return errorResult(err);
@@ -679,7 +705,7 @@ export function createTelegramUserMcpServer(
     {
       title: "Send as the logged-in user",
       description:
-        "[User account] Send a text message as the personal Telegram account (not a bot). Confirm destination and text with the user first. A disclaimer footer is appended to every message unless TELEGRAM_DISCLAIMER is off, and it counts against Telegram's 4096-character limit.",
+        "[User account] Send a text message as the personal Telegram account (not a bot). Confirm destination and text with the user first. Prefer a dialog id from list_dialogs: a chat title has to be resolved against the dialog list first, which costs an extra round trip and fails when the title is ambiguous. A disclaimer footer is appended to every message unless TELEGRAM_DISCLAIMER is off, and it counts against Telegram's 4096-character limit.",
       inputSchema: z.object({
         chat: z
           .string()
@@ -702,12 +728,14 @@ export function createTelegramUserMcpServer(
             new Error("Not logged in. Complete user-account login before sending."),
           );
         }
+        const { target, resolved } = await resolveDestination(active, chat);
         const sentText = applyDisclaimer(text);
-        const result = await active.sendMessage(chat, sentText);
+        const result = await active.sendMessage(target, sentText);
         return jsonResult({
           ...result,
           identity: "user-account",
           disclaimer: disclaimerText(),
+          ...(resolved === undefined ? {} : { resolved_chat: resolved }),
         });
       } catch (err) {
         return errorResult(err);

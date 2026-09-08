@@ -79,6 +79,12 @@ You do not have to put the values in a config file. Hand them to the agent and i
 
 **Only user-account mode needs this.** Bot API mode needs nothing but a [@BotFather](https://t.me/BotFather) token, which takes about thirty seconds inside Telegram. If you only want notifications or to post to a channel, use that.
 
+## Naming a chat
+
+`send_message` and `get_messages` take an id, `me`, an `@username`, or a chat title. Ids and `@usernames` go straight out. A title is resolved against your dialog list first, and an ambiguous one is refused with the candidates named rather than guessed at.
+
+This exists because handing a title to the underlying client makes it look for a username that was never there, which in a short-lived process means a minute of hanging instead of an error. Prefer an id from `list_dialogs` when you have one: it is the only form with no lookup at all.
+
 ## Security
 
 ### Bot token
@@ -119,7 +125,7 @@ The repo never contains real tokens, api hashes, or sessions. `mcp.json` only ha
 | `list_dialogs` | Real dialog / inbox list |
 | `search_dialogs` | Filter dialogs by title, username, or id |
 | `get_messages` | Recent history for a chat |
-| `send_message` | Send text **as the user** (`me`, `@username`, or dialog id) |
+| `send_message` | Send text **as the user** (`me`, `@username`, dialog id, or a chat title) |
 
 Both servers expose `send_message` and `get_me`. Prefer the MCP server name (`telegram-bot` vs `telegram-user`). Tool descriptions are prefixed `[Bot API]` or `[User account]`.
 

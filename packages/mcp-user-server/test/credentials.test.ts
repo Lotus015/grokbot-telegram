@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import {
   defaultSessionPath,
   existingSessionPath,
@@ -20,8 +20,20 @@ const keys = [
   "TELEGRAM_SESSION_PATH",
 ];
 
+// getUserApiCredentials falls back to a file next to the session, so a test
+// that leaves TELEGRAM_SESSION_PATH unset reads the developer's real
+// credentials out of their home directory.
+let isolated: string | undefined;
+
+beforeEach(() => {
+  isolated = mkdtempSync(join(tmpdir(), "tg-isolated-"));
+  process.env.TELEGRAM_SESSION_PATH = join(isolated, "user.session");
+});
+
 afterEach(() => {
   for (const key of keys) delete process.env[key];
+  if (isolated !== undefined) rmSync(isolated, { recursive: true, force: true });
+  isolated = undefined;
 });
 
 describe("getUserApiCredentials", () => {

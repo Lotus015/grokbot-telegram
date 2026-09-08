@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { createTelegramUserMcpServer } from "../src/server.js";
 import type { TelegramUserClient, UserInfo } from "../src/types.js";
@@ -77,7 +77,18 @@ const expectedTools = [
   "start_qr_login",
 ];
 
+let isolated: string | undefined;
+
+beforeEach(() => {
+  // Same reason as credentials.test.ts: never let a test see the real
+  // ~/.grokbot-telegram.
+  isolated = mkdtempSync(join(tmpdir(), "tg-isolated-"));
+  process.env.TELEGRAM_SESSION_PATH = join(isolated, "user.session");
+});
+
 afterEach(() => {
+  if (isolated !== undefined) rmSync(isolated, { recursive: true, force: true });
+  isolated = undefined;
   delete process.env.TELEGRAM_API_ID;
   delete process.env.TELEGRAM_API_HASH;
   delete process.env.TELEGRAM_SESSION;

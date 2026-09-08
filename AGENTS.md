@@ -61,6 +61,8 @@ Three things the footer logic must keep doing (each has tests):
 
 **An injected mock can hide the seam it stands in for.** The login-restart fix shipped broken once: the server passed a resumed session into `createClient`, the real factory took no arguments and dropped it, and every test passed because the mock ignored the argument too. TypeScript accepts a narrower function for a wider signature, so nothing complained. When a test replaces a collaborator, assert on what the collaborator was *handed*, and keep one test against the real implementation.
 
+**A chat title must never reach the Telegram client raw.** GramJS resolves a bare string by looking up a username; handed a group title it hunts for something that does not exist and, in a one-shot process, hangs until the host times out — a minute of nothing where an immediate error belonged. `destination.ts` classifies the input first and resolves titles against the dialog list. Ids and `@usernames` keep the fast path; a bare word checks the user's own chats before falling back to the username namespace, because misdelivering to a stranger is worse than an extra round trip.
+
 **Never log or echo secrets.** Bot tokens, `api_hash`, and session strings are redacted through `redact.ts` in each package. Errors go out via `safeErrorMessage`. A session string is full account access — treat it like a password.
 
 **Version numbers move together.** Root `package.json`, `.cursor-plugin/plugin.json`, both `packages/*/package.json`, and the `VERSION` constant in both `src/server.ts` files. `npm run validate` fails if the root and plugin manifests disagree.
