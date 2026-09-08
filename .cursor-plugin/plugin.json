@@ -1,8 +1,7 @@
 {
-  "name": "telegram-bot",
-  "displayName": "Telegram",
-  "version": "0.4.0",
+  "name": "grokbot-telegram",
   "description": "Telegram from Cursor in two modes: Bot API (messages as your @bot) and MTProto user account (messages as you). Configure one or both.",
+  "version": "0.4.0",
   "author": {
     "name": "Lotus / Lotus015"
   },
@@ -20,6 +19,8 @@
     "notifications"
   ],
   "logo": "assets/logo.svg",
+  "skills": "skills",
+  "mcpServers": "mcp.json",
   "variables": {
     "type": "object",
     "properties": {

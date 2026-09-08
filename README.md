@@ -165,12 +165,12 @@ Drop this into any MCP client config (Claude Code, Claude Desktop, Cursor, …):
   "mcpServers": {
     "telegram-bot": {
       "command": "npx",
-      "args": ["-y", "grokbot-telegram", "bot"],
+      "args": ["-y", "grokbot-telegram@0.4.0", "bot"],
       "env": { "TELEGRAM_BOT_TOKEN": "…" }
     },
     "telegram-user": {
       "command": "npx",
-      "args": ["-y", "grokbot-telegram", "user"],
+      "args": ["-y", "grokbot-telegram@0.4.0", "user"],
       "env": {
         "TELEGRAM_API_ID": "…",
         "TELEGRAM_API_HASH": "…",
@@ -183,9 +183,9 @@ Drop this into any MCP client config (Claude Code, Claude Desktop, Cursor, …):
 
 ### Cursor Marketplace (when listed)
 
-1. Open **Customize** → search **telegram-bot**, or visit [cursor.com/marketplace](https://cursor.com/marketplace).
+1. Open **Customize** → search **grokbot-telegram**, or visit [cursor.com/marketplace](https://cursor.com/marketplace).
 2. Install the plugin.
-3. **Plugins → Configure** → set the variables for the mode(s) you want.
+3. **Plugins → Configure** → set the variables for the mode(s) you want. For user-account mode you can skip this and let the agent store `api_id`/`api_hash` for you.
 
 ### From this repository
 
@@ -316,12 +316,12 @@ npm run build
 {
   "telegram-bot": {
     "command": "npx",
-    "args": ["-y", "grokbot-telegram", "bot"],
+    "args": ["-y", "grokbot-telegram@0.4.0", "bot"],
     "env": { "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}" }
   },
   "telegram-user": {
     "command": "npx",
-    "args": ["-y", "grokbot-telegram", "user"],
+    "args": ["-y", "grokbot-telegram@0.4.0", "user"],
     "env": {
       "TELEGRAM_API_ID": "${TELEGRAM_API_ID}",
       "TELEGRAM_API_HASH": "${TELEGRAM_API_HASH}",
@@ -335,8 +335,10 @@ npm run build
 
 - Single Cursor Plugin (`.cursor-plugin/plugin.json`), not a multi-plugin `marketplace.json` repo.
 - **MTProto user client + Bot API**, not Bot API alone.
-- Plugin `name` remains `telegram-bot` for continuity with v0.1.0; product copy and `displayName` describe both modes.
-- Version `0.3.0`, MIT, logo at `assets/logo.svg`.
+- Plugin `name` is `grokbot-telegram`, matching the npm package and the repository.
+- MIT. Version lives in `package.json`; `.cursor-plugin/plugin.json` and the pin in `mcp.json` are checked against it by `npm run validate`.
+- Logo at `assets/logo.svg` — a plain outline mark, deliberately not Telegram's own logo or brand colour, since this is a third-party plugin.
+- `mcp.json` pins the version it launches, so what a reviewer reads is what runs.
 - Variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_DISCLAIMER` (all optional in the schema).
 - Submit: [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
 

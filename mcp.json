@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "grokbot-telegram",
+        "grokbot-telegram@0.4.0",
         "bot"
       ],
       "env": {
@@ -16,7 +16,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "grokbot-telegram",
+        "grokbot-telegram@0.4.0",
         "user"
       ],
       "env": {
