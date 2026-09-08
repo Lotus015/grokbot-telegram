@@ -121,9 +121,17 @@ describe("login across a process restart", () => {
     };
   }
 
-  async function connect(client: TelegramUserClient) {
+  async function connect(
+    client: TelegramUserClient,
+    handed: (string | undefined)[] = [],
+  ) {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = createTelegramUserMcpServer({ createClient: () => client });
+    const server = createTelegramUserMcpServer({
+      createClient: (session) => {
+        handed.push(session);
+        return client;
+      },
+    });
     const mcp = new Client({ name: "test", version: "0.0.0" });
     await Promise.all([
       server.connect(serverTransport),
@@ -154,7 +162,8 @@ describe("login across a process restart", () => {
     assert.equal(stored?.session, "pre-auth-session-from-process-1");
 
     // Process 2 knows nothing except what is on disk.
-    const second = await connect(mockClient(sent));
+    const handed: (string | undefined)[] = [];
+    const second = await connect(mockClient(sent), handed);
     const completed = await second.mcp.callTool({
       name: "complete_login",
       arguments: { code: "11111" },
@@ -164,6 +173,11 @@ describe("login across a process restart", () => {
 
     // The hash came from the first process, not from a fresh sendCode.
     assert.deepEqual(sent.signedIn, ["+15551234567|hash-from-process-1|11111"]);
+
+    // And the client was built on the auth key that requested the code. This
+    // is the part the mock used to hide: the server passed a session the real
+    // factory then ignored, and Telegram answered PHONE_CODE_EXPIRED.
+    assert.deepEqual(handed, ["pre-auth-session-from-process-1"]);
 
     // A redeemed auth key must not stay on disk.
     assert.equal(readPendingLogin(Date.now(), env), null);

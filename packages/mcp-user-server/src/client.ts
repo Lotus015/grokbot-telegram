@@ -107,9 +107,15 @@ function qrUrl(token: Buffer): string {
 
 export { qrUrl };
 
-export function createGramJsUserClient(): TelegramUserClient {
+// `resumeSession` carries the pre-authorization session of a login started in
+// an earlier process. Without it a restarted process builds a fresh auth key
+// and Telegram answers PHONE_CODE_EXPIRED, because the pending code is bound
+// to the key that requested it.
+export function createGramJsUserClient(
+  resumeSession?: string,
+): TelegramUserClient {
   const { apiId, apiHash } = getUserApiCredentials();
-  const session = new StringSession(readSessionString());
+  const session = new StringSession(resumeSession ?? readSessionString());
   const client = new TelegramClient(session, apiId, apiHash, {
     connectionRetries: 5,
     deviceModel: "Cursor Telegram plugin",
