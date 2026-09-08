@@ -120,6 +120,12 @@ Restarting Cursor reuses the session. Do not check session files into git (they 
 
 If `complete_login` reports no pending login, the code genuinely expired (15 minutes). Call `start_login` again.
 
+## QR cannot survive a restart
+
+If the server process restarts between `start_qr_login` and the scan, the login is lost — there is no way to finish it, and no amount of retrying the old code helps. Telegram announces the scan on the connection that exported the code.
+
+On a host that runs one process per tool call, **do not offer QR at all**. Use `start_login` with a phone number: that flow is built to survive a restart and is tested for it.
+
 ## QR after a restart
 
 A QR code lives about half a minute, and the scan authorizes the session rather than handing back something to redeem. So after a restart `complete_qr_login` either succeeds outright — the scan already landed and the session is adopted — or it returns `waiting: true` **with a new `login_url`**.

@@ -298,78 +298,33 @@ describe("QR arrives as a scannable image", () => {
   });
 });
 
-// The failure this covers: the user scanned, Telegram listed the new device,
-// then the process died — and the next one resumed a key nobody had
-// authorized, because a data centre switch had replaced it in the meantime.
-describe("the pending session follows the live auth key", () => {
-  it("rewrites the pending file after a data centre switch", async () => {
-    const { dir } = resumingProcess();
-    try {
-      const expired = Object.assign(new Error("AUTH_TOKEN_EXPIRED"), {
-        errorMessage: "AUTH_TOKEN_EXPIRED",
-      });
-      await callComplete(
-        qrClient(
-          {
-            authorized: false,
-            importThrows: expired,
-            sessionAfterSwitchDc: "session-on-the-new-dc",
-            tokens: [
-              { kind: "migrate", dcId: 4, token: Buffer.from("old") },
-              { kind: "token", token: Buffer.from("new"), expires: 99 },
-            ],
-          },
-          { exports: 0, imports: 0 },
-        ),
-      );
-
-      const stored = readPendingLogin();
-      assert.equal(
-        stored?.session,
-        "session-on-the-new-dc",
-        "pending still holds the auth key from before the switch",
-      );
-      assert.equal(stored?.kind, "qr");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("rewrites the pending file when the scan lands", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "tg-qr-scan-"));
+// A QR login cannot be resumed. Telegram announces the scan on the connection
+// that exported the code, and the authorization only exists once that same
+// connection redeems it, so a restarted process has nothing to work with.
+// Persisting a pre-authorization auth key for it would be a secret on disk
+// that nothing can ever use.
+describe("QR keeps no secret on disk", () => {
+  it("writes no pending file when a QR login starts", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tg-qr-nopending-"));
     process.env.TELEGRAM_SESSION_PATH = join(dir, "user.session");
     process.env.TELEGRAM_API_ID = "12345";
     process.env.TELEGRAM_API_HASH = "deadbeefdeadbeefdeadbeefdeadbeef";
     try {
-      let fireScan: (() => void) | undefined;
       const client = qrClient(
         {
           authorized: false,
-          captureLoginTokenListener: (fire) => {
-            fireScan = fire;
-          },
-          sessionAfterSwitchDc: "session-once-the-scan-landed",
           tokens: [{ kind: "token", token: Buffer.from("code"), expires: 99 }],
         },
         { exports: 0, imports: 0 },
       );
-
       const { mcp, server } = await connect(client);
-      await mcp.callTool({ name: "start_qr_login", arguments: {} });
-      assert.ok(fireScan, "no login-token listener was registered");
+      const started = await mcp.callTool({ name: "start_qr_login", arguments: {} });
+      assert.equal(started.isError ?? false, false);
 
-      // Telegram announces the scan on the live connection. If the process
-      // dies right after this, disk must already hold the current key.
-      const before = readPendingLogin()?.session;
-      (client as unknown as { switchDc: () => Promise<void> }).switchDc();
-      fireScan();
-
-      const after = readPendingLogin()?.session;
-      assert.equal(before, "resumed-pre-auth-session");
       assert.equal(
-        after,
-        "session-once-the-scan-landed",
-        "the scan did not refresh the session held on disk",
+        existsSync(pendingLoginPath()),
+        false,
+        "a pre-auth auth key was written for a login that cannot be resumed",
       );
 
       await mcp.close();
@@ -379,7 +334,35 @@ describe("the pending session follows the live auth key", () => {
     }
   });
 
-  it("clears the pending file when start_qr_login finds it already linked", async () => {
+  it("says the process has to stay alive", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tg-qr-warn-"));
+    process.env.TELEGRAM_SESSION_PATH = join(dir, "user.session");
+    process.env.TELEGRAM_API_ID = "12345";
+    process.env.TELEGRAM_API_HASH = "deadbeefdeadbeefdeadbeefdeadbeef";
+    try {
+      const client = qrClient(
+        {
+          authorized: false,
+          tokens: [{ kind: "token", token: Buffer.from("code"), expires: 99 }],
+        },
+        { exports: 0, imports: 0 },
+      );
+      const { mcp, server } = await connect(client);
+      const started = await mcp.callTool({ name: "start_qr_login", arguments: {} });
+      const content = started.content as { type: string; text?: string }[];
+      const text = content.find((c) => c.type === "text")?.text ?? "";
+      // Silently failing after a restart is what wasted a day of testing.
+      assert.match(text, /cannot be resumed/);
+      assert.match(text, /start_login/);
+
+      await mcp.close();
+      await server.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still clears a pending file left by a phone login it completes", async () => {
     const { dir } = resumingProcess();
     try {
       const client = qrClient(
@@ -389,8 +372,6 @@ describe("the pending session follows the live auth key", () => {
       const { mcp, server } = await connect(client);
       const started = await mcp.callTool({ name: "start_qr_login", arguments: {} });
       assert.equal(started.isError ?? false, false);
-
-      // It persisted a real session, so the pre-auth key must not linger.
       assert.equal(existsSync(pendingLoginPath()), false);
 
       await mcp.close();

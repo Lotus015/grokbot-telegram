@@ -148,15 +148,6 @@ export function createTelegramUserMcpServer(
   const QR_DELIVERY =
     "The scannable QR image is attached to this result — forward it to the user immediately, on its own, before any commentary. Do not render your own image and do not send login_url instead: the code dies in seconds, and anything ahead of it eats the window. login_url is only a fallback for a client that cannot show images. The user scans it in Telegram → Settings → Devices → Link Desktop Device.";
 
-  // The authorization attaches to the auth key the client holds *right now*,
-  // and that key changes underfoot: a QR login that migrates data centre gets
-  // a brand new key on the new one. Whatever is on disk has to keep up, or a
-  // process killed after the scan resumes a key nobody ever authorized.
-  function refreshPendingSession(active: TelegramUserClient): void {
-    const stored = readPendingLogin();
-    if (stored === null) return;
-    rememberPendingLogin(active, stored.kind, stored.phone);
-  }
 
   // How many dialogs to scan when the caller named a chat by title. Deep
   // enough for a real inbox, shallow enough to stay fast.
@@ -226,8 +217,6 @@ export function createTelegramUserMcpServer(
     let token = await active.exportLoginToken();
     if (token.kind === "migrate") {
       await active.switchDc(token.dcId);
-      // New data centre, new auth key. This is the one the scan will bind to.
-      refreshPendingSession(active);
       try {
         token = await active.importLoginToken(token.token);
       } catch (err) {
@@ -257,14 +246,13 @@ export function createTelegramUserMcpServer(
       // Exporting again produced a *different* code. Saying only "not
       // completed yet" would send the user back to a QR that can no longer
       // be completed, so hand over the new one.
-      refreshPendingSession(active);
       return {
         ok: false,
         waiting: true,
         login_url: qrUrl(token.token),
         expires: token.expires,
         expires_in_seconds: expiresInSeconds(token.expires),
-        note: `Not linked yet, and this is a NEW QR code — any code shown earlier can no longer be completed. ${QR_DELIVERY} Then call complete_qr_login again; each attempt hands back a fresh code, so repeat as needed. If 2FA is enabled, pass password. If the window keeps closing before the user can scan, switch to start_login — a phone code lives minutes, not seconds.`,
+        note: `Not linked yet, and this is a NEW QR code — any code shown earlier can no longer be completed. ${QR_DELIVERY} Then call complete_qr_login again; each attempt hands back a fresh code, so repeat as needed. If 2FA is enabled, pass password. If the process running this server restarted since start_qr_login, that is why: a QR login cannot be resumed, and start_login with a phone number is the path that survives one.`,
       };
     }
     return {
@@ -509,10 +497,7 @@ export function createTelegramUserMcpServer(
           resolve = res;
         });
         qrScanned = { promise, resolve };
-        qrUnsubscribe = active.onLoginToken(() => {
-          qrScanned?.resolve();
-          refreshPendingSession(active);
-        });
+        qrUnsubscribe = active.onLoginToken(() => qrScanned?.resolve());
         const token = await active.exportLoginToken();
         if (token.kind === "success") {
           clearPendingLogin();
@@ -528,13 +513,14 @@ export function createTelegramUserMcpServer(
         if (token.kind !== "token") {
           return errorResult(new Error("Could not export a QR login token."));
         }
-        rememberPendingLogin(active, "qr");
         return await loginResult({
           ok: true,
           login_url: qrUrl(token.token),
           expires: token.expires,
           expires_in_seconds: expiresInSeconds(token.expires),
-          how: `${QR_DELIVERY} Then call complete_qr_login. If it reports waiting, it returns a fresh code — show that one. If the user cannot scan in time, start_login is the better path: a phone code lives minutes.`,
+          how: `${QR_DELIVERY} Then call complete_qr_login. If it reports waiting, it returns a fresh code — show that one.`,
+          warning:
+            "This server process must stay alive from here until the scan completes. A QR login cannot be resumed by a later process: Telegram announces the scan on the connection that exported the code, and the authorization only exists once that same connection redeems it. On a host that starts a process per tool call, use start_login with a phone number — that one does survive a restart.",
         });
       } catch (err) {
         return errorResult(err);
@@ -589,7 +575,6 @@ export function createTelegramUserMcpServer(
             qrScanned.promise,
             new Promise((resolve) => setTimeout(resolve, wait)),
           ]);
-          refreshPendingSession(active);
         }
         try {
           return await loginResult(await finishQr(active, password));
