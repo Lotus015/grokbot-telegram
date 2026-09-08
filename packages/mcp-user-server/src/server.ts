@@ -16,7 +16,11 @@ import {
 import { filterDialogs } from "./dialogs.js";
 import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
-import { isPasswordNeeded, type TelegramUserClient } from "./types.js";
+import {
+  isExpiredLoginToken,
+  isPasswordNeeded,
+  type TelegramUserClient,
+} from "./types.js";
 
 const VERSION = "0.3.1";
 
@@ -108,7 +112,14 @@ export function createTelegramUserMcpServer(
     let token = await active.exportLoginToken();
     if (token.kind === "migrate") {
       await active.switchDc(token.dcId);
-      token = await active.importLoginToken(token.token);
+      try {
+        token = await active.importLoginToken(token.token);
+      } catch (err) {
+        if (!isExpiredLoginToken(err)) throw err;
+        // The token this login started with has lapsed. That is a dead QR,
+        // not a broken client: ask the server for a fresh one to show.
+        token = await active.exportLoginToken();
+      }
     }
     if (token.kind === "success") {
       clearPendingLogin();
@@ -125,6 +136,18 @@ export function createTelegramUserMcpServer(
       clearPendingLogin();
       const saved = persist(active);
       return { ok: true, me, ...saved, warning: SESSION_WARNING };
+    }
+    if (token.kind === "token") {
+      // Exporting again produced a *different* code. Saying only "not
+      // completed yet" would send the user back to a QR that can no longer
+      // be completed, so hand over the new one.
+      return {
+        ok: false,
+        waiting: true,
+        login_url: qrUrl(token.token),
+        expires: token.expires,
+        note: "Not linked yet, and this is a NEW QR code — any code shown earlier can no longer be completed. Show login_url, have the user scan it in Telegram (Settings → Devices → Link Desktop Device), then call complete_qr_login again. If 2FA is enabled, pass password.",
+      };
     }
     return {
       ok: false,
@@ -365,6 +388,19 @@ export function createTelegramUserMcpServer(
     async ({ password, wait_ms }) => {
       try {
         const active = await getClient();
+        // The scan can land while this process does not exist: the phone
+        // authorizes the auth key server-side, and the resumed session is
+        // that key. There is no token left to redeem, and none is needed.
+        if (await active.isAuthorized()) {
+          clearPendingLogin();
+          const saved = persist(active);
+          return jsonResult({
+            ok: true,
+            me: await active.getMe(),
+            ...saved,
+            warning: SESSION_WARNING,
+          });
+        }
         if (qrScanned) {
           const wait = wait_ms ?? 15_000;
           await Promise.race([
@@ -384,6 +420,7 @@ export function createTelegramUserMcpServer(
               );
             }
             const me = await active.signInWithPassword(password);
+            clearPendingLogin();
             const saved = persist(active);
             return jsonResult({
               ok: true,

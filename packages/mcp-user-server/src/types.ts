@@ -60,6 +60,17 @@ export function isPasswordNeeded(err: unknown): boolean {
   );
 }
 
+// A QR login token lives about half a minute. Redeeming one that has lapsed
+// is an ordinary outcome of resuming a login, not a protocol failure.
+export function isExpiredLoginToken(err: unknown): boolean {
+  const e = err as { errorMessage?: string; message?: string };
+  const text = `${e.errorMessage ?? ""} ${e.message ?? ""}`;
+  return (
+    text.includes("AUTH_TOKEN_EXPIRED") ||
+    /authorization token has expired/i.test(text)
+  );
+}
+
 export function resolveChatTarget(chat: string): string {
   const trimmed = chat.trim();
   if (trimmed === "self" || trimmed === "saved") return "me";

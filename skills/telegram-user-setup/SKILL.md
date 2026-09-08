@@ -103,3 +103,9 @@ Restarting Cursor reuses the session. Do not check session files into git (they 
 `start_login` and `complete_login` do not have to run in the same process. The pending state is persisted next to the session file, so if the MCP server restarts between the two calls, `complete_login` still works — do not make the user start over just because the process cycled.
 
 If `complete_login` reports no pending login, the code genuinely expired (15 minutes). Call `start_login` again.
+
+## QR after a restart
+
+A QR code lives about half a minute, and the scan authorizes the session rather than handing back something to redeem. So after a restart `complete_qr_login` either succeeds outright — the scan already landed and the session is adopted — or it returns `waiting: true` **with a new `login_url`**.
+
+When you get that, show the new `login_url`. Do not tell the user to scan again the code you showed before: it can no longer be completed, and re-showing it is the one thing guaranteed not to work.
