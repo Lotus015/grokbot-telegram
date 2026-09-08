@@ -109,3 +109,16 @@ If `complete_login` reports no pending login, the code genuinely expired (15 min
 A QR code lives about half a minute, and the scan authorizes the session rather than handing back something to redeem. So after a restart `complete_qr_login` either succeeds outright — the scan already landed and the session is adopted — or it returns `waiting: true` **with a new `login_url`**.
 
 When you get that, show the new `login_url`. Do not tell the user to scan again the code you showed before: it can no longer be completed, and re-showing it is the one thing guaranteed not to work.
+
+## Prefer phone login in a chat
+
+QR is the worse path when login happens through a conversation. Telegram gives a QR token roughly 30 seconds, and that clock starts when `start_qr_login` returns — not when the user finally sees the code. Rendering it into a chat, the user reading it, picking up the phone and opening Settings → Devices routinely costs more than the whole window.
+
+**Default to `start_login` with a phone number.** The code lives minutes rather than seconds, it survives a process restart, and there is nothing to render in time.
+
+Use QR only when the user does not want to give a phone number, or asks for it. Then:
+
+- Send `login_url` as the entire message, on its own, before any explanation. Anything ahead of it spends the window.
+- Read `expires_in_seconds` and say it plainly: "about 30 seconds".
+- If `complete_qr_login` reports waiting, it hands back a **fresh** code. Show that one. Repeat as needed — each attempt restarts the clock. Never re-show a code from an earlier reply.
+- After two failed windows, offer phone login instead of a third QR.

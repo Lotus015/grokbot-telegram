@@ -108,6 +108,18 @@ export function createTelegramUserMcpServer(
     return { session, session_file };
   }
 
+  // Telegram gives a QR token about half a minute. Callers need that as a
+  // number, not a unix timestamp they have to reason about, because the whole
+  // difficulty with QR in a chat is that the window closes while the code is
+  // still being rendered into the conversation.
+  function expiresInSeconds(expires: number): number {
+    const remaining = Math.round(expires - Date.now() / 1000);
+    return Number.isFinite(remaining) ? Math.max(0, remaining) : 0;
+  }
+
+  const QR_DELIVERY =
+    "Send login_url to the user as the whole message, on its own, before any commentary — the code dies in seconds and anything ahead of it eats the window. Telegram → Settings → Devices → Link Desktop Device.";
+
   async function finishQr(active: TelegramUserClient, password?: string) {
     let token = await active.exportLoginToken();
     if (token.kind === "migrate") {
@@ -146,7 +158,8 @@ export function createTelegramUserMcpServer(
         waiting: true,
         login_url: qrUrl(token.token),
         expires: token.expires,
-        note: "Not linked yet, and this is a NEW QR code — any code shown earlier can no longer be completed. Show login_url, have the user scan it in Telegram (Settings → Devices → Link Desktop Device), then call complete_qr_login again. If 2FA is enabled, pass password.",
+        expires_in_seconds: expiresInSeconds(token.expires),
+        note: `Not linked yet, and this is a NEW QR code — any code shown earlier can no longer be completed. ${QR_DELIVERY} Then call complete_qr_login again; each attempt hands back a fresh code, so repeat as needed. If 2FA is enabled, pass password. If the window keeps closing before the user can scan, switch to start_login — a phone code lives minutes, not seconds.`,
       };
     }
     return {
@@ -352,7 +365,8 @@ export function createTelegramUserMcpServer(
           ok: true,
           login_url: qrUrl(token.token),
           expires: token.expires,
-          how: "Open Telegram → Settings → Devices → Link Desktop Device, then scan or open login_url. After scanning, call complete_qr_login.",
+          expires_in_seconds: expiresInSeconds(token.expires),
+          how: `${QR_DELIVERY} Then call complete_qr_login. If it reports waiting, it returns a fresh code — show that one. If the user cannot scan in time, start_login is the better path: a phone code lives minutes.`,
         });
       } catch (err) {
         return errorResult(err);

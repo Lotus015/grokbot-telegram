@@ -238,6 +238,8 @@ From a clone, the equivalent is `node dist/login.js` after `npm run build`.
 
 Or use `start_login` / `start_qr_login` from the agent.
 
+For login through a chat, prefer `start_login`. A QR token lives about 30 seconds and that clock starts when the tool returns, not when the code reaches the screen — which is usually not enough time in a conversation. The token cannot be extended; it is Telegram's limit. What the tools do instead is make each retry cheap: a waiting reply carries a fresh `login_url` and `expires_in_seconds`, so the user gets a new code with a full window rather than being sent back to a dead one.
+
 3. Confirm `get_me` is your user (`isBot: false`).
 4. `list_dialogs` / `search_dialogs`, confirm destination + text, then `send_message`.
 

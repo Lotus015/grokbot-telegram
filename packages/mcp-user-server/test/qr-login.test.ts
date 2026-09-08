@@ -166,6 +166,40 @@ describe("QR login resumed in another process", () => {
     }
   });
 
+  it("reports the remaining window as seconds, floored at zero", async () => {
+    const { dir } = resumingProcess();
+    const calls: Calls = { exports: 0, imports: 0 };
+    try {
+      const soon = Math.round(Date.now() / 1000) + 30;
+      const live = await callComplete(
+        qrClient(
+          { authorized: false, tokens: [{ kind: "token", token: Buffer.from("t"), expires: soon }] },
+          calls,
+        ),
+      );
+      const parsed = JSON.parse(live.text) as { expires_in_seconds: number };
+      // The caller needs a countdown, not a unix timestamp to subtract.
+      assert.ok(
+        parsed.expires_in_seconds >= 28 && parsed.expires_in_seconds <= 30,
+        `expected ~30s, got ${parsed.expires_in_seconds}`,
+      );
+
+      const stale = await callComplete(
+        qrClient(
+          { authorized: false, tokens: [{ kind: "token", token: Buffer.from("t"), expires: 42 }] },
+          { exports: 0, imports: 0 },
+        ),
+      );
+      // A timestamp already in the past must not read as negative time left.
+      assert.equal(
+        (JSON.parse(stale.text) as { expires_in_seconds: number }).expires_in_seconds,
+        0,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("returns the new code even without a migrate step", async () => {
     const { dir } = resumingProcess();
     const calls: Calls = { exports: 0, imports: 0 };
