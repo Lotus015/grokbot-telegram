@@ -242,6 +242,10 @@ For login through a chat, prefer `start_login`. A QR token lives about 30 second
 
 The QR is drawn locally. A login token is a credential, so it never goes to an external image service.
 
+Not every MCP host paints tool-result images on its own; where it does not, the agent forwards the base64 it was handed. Either way the code is generated once, here, rather than round-tripped through the agent.
+
+The session shows up in Telegram → Settings → Devices as **grokbot-telegram**, so it is easy to find and revoke.
+
 3. Confirm `get_me` is your user (`isBot: false`).
 4. `list_dialogs` / `search_dialogs`, confirm destination + text, then `send_message`.
 

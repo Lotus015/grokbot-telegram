@@ -96,6 +96,25 @@ if (rootPkg) {
   }
 }
 
+// The user client reports this to Telegram, where it shows up in the account
+// owner's device list. It drifted to 0.2.0 once already.
+for (const rel of [
+  "packages/mcp-server/src/server.ts",
+  "packages/mcp-user-server/src/server.ts",
+  "packages/mcp-user-server/src/client.ts",
+]) {
+  const raw = read(rel);
+  if (raw == null) continue;
+  const match = raw.match(/const VERSION = "([^"]+)"/);
+  if (match == null) {
+    errors.push(`${rel} declares no VERSION constant`);
+  } else if (match[1] !== rootPkg?.version) {
+    errors.push(
+      `${rel} VERSION is ${match[1]}, expected ${rootPkg?.version} from package.json`,
+    );
+  }
+}
+
 const mcp = mustJson("mcp.json");
 if (mcp) {
   const bot = mcp.mcpServers?.["telegram-bot"];

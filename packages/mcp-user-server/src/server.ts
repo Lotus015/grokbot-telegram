@@ -141,6 +141,16 @@ export function createTelegramUserMcpServer(
   const QR_DELIVERY =
     "The scannable QR image is attached to this result — forward it to the user immediately, on its own, before any commentary. Do not render your own image and do not send login_url instead: the code dies in seconds, and anything ahead of it eats the window. login_url is only a fallback for a client that cannot show images. The user scans it in Telegram → Settings → Devices → Link Desktop Device.";
 
+  // The authorization attaches to the auth key the client holds *right now*,
+  // and that key changes underfoot: a QR login that migrates data centre gets
+  // a brand new key on the new one. Whatever is on disk has to keep up, or a
+  // process killed after the scan resumes a key nobody ever authorized.
+  function refreshPendingSession(active: TelegramUserClient): void {
+    const stored = readPendingLogin();
+    if (stored === null) return;
+    rememberPendingLogin(active, stored.kind, stored.phone);
+  }
+
   async function loginResult(payload: Record<string, unknown>) {
     const url = payload.login_url;
     return typeof url === "string" ? qrResult(url, payload) : jsonResult(payload);
@@ -150,6 +160,8 @@ export function createTelegramUserMcpServer(
     let token = await active.exportLoginToken();
     if (token.kind === "migrate") {
       await active.switchDc(token.dcId);
+      // New data centre, new auth key. This is the one the scan will bind to.
+      refreshPendingSession(active);
       try {
         token = await active.importLoginToken(token.token);
       } catch (err) {
@@ -179,6 +191,7 @@ export function createTelegramUserMcpServer(
       // Exporting again produced a *different* code. Saying only "not
       // completed yet" would send the user back to a QR that can no longer
       // be completed, so hand over the new one.
+      refreshPendingSession(active);
       return {
         ok: false,
         waiting: true,
@@ -371,9 +384,13 @@ export function createTelegramUserMcpServer(
           resolve = res;
         });
         qrScanned = { promise, resolve };
-        qrUnsubscribe = active.onLoginToken(() => qrScanned?.resolve());
+        qrUnsubscribe = active.onLoginToken(() => {
+          qrScanned?.resolve();
+          refreshPendingSession(active);
+        });
         const token = await active.exportLoginToken();
         if (token.kind === "success") {
+          clearPendingLogin();
           const saved = persist(active);
           return jsonResult({
             ok: true,
@@ -447,6 +464,7 @@ export function createTelegramUserMcpServer(
             qrScanned.promise,
             new Promise((resolve) => setTimeout(resolve, wait)),
           ]);
+          refreshPendingSession(active);
         }
         try {
           return await loginResult(await finishQr(active, password));

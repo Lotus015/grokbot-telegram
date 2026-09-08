@@ -118,7 +118,8 @@ QR is the worse path when login happens through a conversation. Telegram gives a
 
 Use QR only when the user does not want to give a phone number, or asks for it. Then:
 
-- **The scannable QR image is attached to the tool result.** Forward that image immediately, on its own, before any explanation. Do not generate your own picture of the code and do not send `login_url` as a substitute — both spend the window you are racing.
+- **The scannable QR image is attached to the tool result** as a base64 PNG in `content[0]`. Forward that image immediately, on its own, before any explanation. Do not generate your own picture of the code and do not send `login_url` as a substitute — both spend the window you are racing.
+- Some hosts do not paint tool-result images by themselves. If yours does not, forward the base64 you already have; do not write it to a file and attach it by path, and do not copy it anywhere first. Every extra hop costs seconds you do not have.
 - `login_url` is a `tg://` link, and it is a fallback for clients that cannot show images. It is useless to a user whose phone does not have the app that opens it; assume they need to scan.
 - Read `expires_in_seconds` and say it plainly: "about 30 seconds".
 - If `complete_qr_login` reports waiting, it hands back a **fresh** code, image included. Show that one. Repeat as needed — each attempt restarts the clock. Never re-show a code from an earlier reply.

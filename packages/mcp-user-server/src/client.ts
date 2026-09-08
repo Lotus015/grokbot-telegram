@@ -15,7 +15,7 @@ import {
   type UserInfo,
 } from "./types.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.1";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object"
@@ -118,7 +118,9 @@ export function createGramJsUserClient(
   const session = new StringSession(resumeSession ?? readSessionString());
   const client = new TelegramClient(session, apiId, apiHash, {
     connectionRetries: 5,
-    deviceModel: "Cursor Telegram plugin",
+    // This is what the account owner sees in Telegram → Settings → Devices,
+    // so it names the package they would search for to find or revoke it.
+    deviceModel: "grokbot-telegram",
     appVersion: VERSION,
     systemVersion: `${process.platform} ${process.arch}`,
     langCode: "en",

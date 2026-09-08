@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import { pendingLoginPath, writePendingLogin } from "../src/pending-login.js";
+import {
+  pendingLoginPath,
+  readPendingLogin,
+  writePendingLogin,
+} from "../src/pending-login.js";
 import { createTelegramUserMcpServer } from "../src/server.js";
 import type { LoginTokenResult, TelegramUserClient } from "../src/types.js";
 
@@ -28,10 +32,13 @@ function qrClient(
     authorized?: boolean;
     tokens?: LoginTokenResult[];
     importThrows?: unknown;
+    sessionAfterSwitchDc?: string;
+    captureLoginTokenListener?: (fire: () => void) => void;
   },
   calls: Calls,
 ): TelegramUserClient {
   const queue = [...(opts.tokens ?? [])];
+  let session = "resumed-pre-auth-session";
   return {
     connect: async () => {},
     disconnect: async () => {},
@@ -54,9 +61,18 @@ function qrClient(
       if (opts.importThrows !== undefined) throw opts.importThrows;
       return { kind: "success" as const, user: me };
     },
-    switchDc: async () => {},
-    onLoginToken: () => () => {},
-    exportSession: () => "resumed-pre-auth-session",
+    switchDc: async () => {
+      // A data centre switch means a fresh auth key, which is the whole
+      // reason the persisted session has to be rewritten.
+      if (opts.sessionAfterSwitchDc !== undefined) {
+        session = opts.sessionAfterSwitchDc;
+      }
+    },
+    onLoginToken: (listener: () => void) => {
+      opts.captureLoginTokenListener?.(listener);
+      return () => {};
+    },
+    exportSession: () => session,
   };
 }
 
@@ -275,6 +291,109 @@ describe("QR arrives as a scannable image", () => {
       assert.equal(isError, false);
       assert.equal(content.some((c) => c.type === "image"), false);
       assert.equal((JSON.parse(textOf(content)) as { ok: boolean }).ok, true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The failure this covers: the user scanned, Telegram listed the new device,
+// then the process died — and the next one resumed a key nobody had
+// authorized, because a data centre switch had replaced it in the meantime.
+describe("the pending session follows the live auth key", () => {
+  it("rewrites the pending file after a data centre switch", async () => {
+    const { dir } = resumingProcess();
+    try {
+      const expired = Object.assign(new Error("AUTH_TOKEN_EXPIRED"), {
+        errorMessage: "AUTH_TOKEN_EXPIRED",
+      });
+      await callComplete(
+        qrClient(
+          {
+            authorized: false,
+            importThrows: expired,
+            sessionAfterSwitchDc: "session-on-the-new-dc",
+            tokens: [
+              { kind: "migrate", dcId: 4, token: Buffer.from("old") },
+              { kind: "token", token: Buffer.from("new"), expires: 99 },
+            ],
+          },
+          { exports: 0, imports: 0 },
+        ),
+      );
+
+      const stored = readPendingLogin();
+      assert.equal(
+        stored?.session,
+        "session-on-the-new-dc",
+        "pending still holds the auth key from before the switch",
+      );
+      assert.equal(stored?.kind, "qr");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rewrites the pending file when the scan lands", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tg-qr-scan-"));
+    process.env.TELEGRAM_SESSION_PATH = join(dir, "user.session");
+    process.env.TELEGRAM_API_ID = "12345";
+    process.env.TELEGRAM_API_HASH = "deadbeefdeadbeefdeadbeefdeadbeef";
+    try {
+      let fireScan: (() => void) | undefined;
+      const client = qrClient(
+        {
+          authorized: false,
+          captureLoginTokenListener: (fire) => {
+            fireScan = fire;
+          },
+          sessionAfterSwitchDc: "session-once-the-scan-landed",
+          tokens: [{ kind: "token", token: Buffer.from("code"), expires: 99 }],
+        },
+        { exports: 0, imports: 0 },
+      );
+
+      const { mcp, server } = await connect(client);
+      await mcp.callTool({ name: "start_qr_login", arguments: {} });
+      assert.ok(fireScan, "no login-token listener was registered");
+
+      // Telegram announces the scan on the live connection. If the process
+      // dies right after this, disk must already hold the current key.
+      const before = readPendingLogin()?.session;
+      (client as unknown as { switchDc: () => Promise<void> }).switchDc();
+      fireScan();
+
+      const after = readPendingLogin()?.session;
+      assert.equal(before, "resumed-pre-auth-session");
+      assert.equal(
+        after,
+        "session-once-the-scan-landed",
+        "the scan did not refresh the session held on disk",
+      );
+
+      await mcp.close();
+      await server.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("clears the pending file when start_qr_login finds it already linked", async () => {
+    const { dir } = resumingProcess();
+    try {
+      const client = qrClient(
+        { authorized: false, tokens: [{ kind: "success", user: me }] },
+        { exports: 0, imports: 0 },
+      );
+      const { mcp, server } = await connect(client);
+      const started = await mcp.callTool({ name: "start_qr_login", arguments: {} });
+      assert.equal(started.isError ?? false, false);
+
+      // It persisted a real session, so the pre-auth key must not linger.
+      assert.equal(existsSync(pendingLoginPath()), false);
+
+      await mcp.close();
+      await server.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
