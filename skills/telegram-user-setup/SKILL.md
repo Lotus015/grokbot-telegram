@@ -11,24 +11,40 @@ This path logs in as the **user's real Telegram account** via [teleproto](https:
 
 This plugin does **not** require `TELEGRAM_BOT_TOKEN` for user-account mode.
 
+## Why the user has to fetch api_id themselves
+
+Telegram issues `api_id`/`api_hash` per developer and **actively rejects credentials that have been published**: a shared pair baked into a distributed app earns every user an `API_ID_PUBLISHED_FLOOD` error at login. So this package cannot ship one, and there is no workaround to look for. Say this plainly if the user pushes back — it is Telegram's rule, not a limitation of the plugin.
+
+It is a one-time, roughly two-minute detour. Your job is to make it feel that short.
+
+If the user only wants notifications, or to post to a channel or group, **offer the Bot API path instead**: `@BotFather` inside Telegram, thirty seconds, no `api_id` at all. Only the user-account path needs this.
+
 ## What the user must provide (first run)
 
-1. **`TELEGRAM_API_ID`** and **`TELEGRAM_API_HASH`** from [my.telegram.org/apps](https://my.telegram.org/apps) (Telegram login, then **API development tools** → create an app).
-2. A **one-time login**: phone + login code (and 2FA cloud password if enabled), **or** QR (“Link Desktop Device”), **or** an existing GramJS / teleproto / Telethon **session string**.
-3. After login, persist the session as `TELEGRAM_SESSION` in Plugins → Configure and/or keep the local session file (`~/.grokbot-telegram/user.session`, mode `0600`).
+1. **`api_id`** and **`api_hash`** — walk them through §1 below, then call `save_api_credentials`. They do not have to touch a config file.
+2. A **one-time login**: phone + login code (and 2FA cloud password if enabled), **or** QR, **or** an existing GramJS / teleproto / Telethon **session string**.
+3. Nothing after that. The session is written to `~/.grokbot-telegram/user.session` at mode `0600` and reused.
 
-Ping the user for api_id / api_hash / phone or QR. **Never ask them to paste secrets into git.** Prefer Plugins → Configure. If they must show a session string once so it can be saved, tell them to store it immediately and not to repeat it in later chats.
+**Never ask them to paste secrets into git.** If a session string has to be shown once, tell them to store it immediately and not to repeat it in later chats.
 
 ## 1. Create an app at my.telegram.org
 
-1. Open [https://my.telegram.org/apps](https://my.telegram.org/apps) and log in with the **same phone number** as the Telegram account they want to use.
-2. Open **API development tools**.
-3. Create an application (any title / short name; platform can be “Other”).
-4. Copy **App api_id** (integer) and **App api_hash** (hex string).
-5. Set them in Cursor **Plugins → Configure**: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`.
-6. Reload the window if `telegram-user` tools do not appear.
+Give the user these steps in one message, numbered, with the link first. Do not spread them over several turns — the whole point is that this takes two minutes.
 
-`api_hash` is a secret. Do not commit it.
+1. Open **https://my.telegram.org/apps**
+2. Enter the **phone number of the account you want me to use**, then the code Telegram sends you *in the app*.
+3. Click **API development tools**.
+4. Fill **App title** and **Short name** with anything (e.g. `grokbot`). Leave the rest empty, platform **Other**. Click **Create application**.
+5. Copy **api_id** (a number) and **api_hash** (32 characters).
+
+Then ask for both and call `save_api_credentials` with them. It stores the pair at mode `0600` next to the session, so the user never edits a config file.
+
+Two things to hold onto while doing this:
+
+- **`api_hash` is a secret.** Do not repeat it back in chat, do not put it in a summary, do not write it to a file of your own. The tool deliberately does not echo it.
+- If the tool rejects the values, it is almost always the classic mistake: the two got swapped, or `api_hash` was copied short. Ask for them again rather than guessing.
+
+Setting `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` as environment variables still works and takes precedence — that is the path for developers who bring their own app.
 
 ## 2. First login (pick one)
 

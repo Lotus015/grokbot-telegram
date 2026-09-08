@@ -70,6 +70,7 @@ const expectedTools = [
   "get_me",
   "get_messages",
   "list_dialogs",
+  "save_api_credentials",
   "search_dialogs",
   "send_message",
   "start_login",

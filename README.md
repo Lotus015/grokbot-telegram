@@ -71,6 +71,14 @@ Two details worth knowing:
 - The footer counts against Telegram's 4096-character limit. If text + footer would exceed it, the send is **refused** with an error naming the overflow rather than quietly truncating your words or dropping the footer.
 - With `parse_mode`, the footer is escaped for that mode. This matters for `MarkdownV2`, where an unescaped `.` or `-` makes Telegram reject the whole message.
 
+## Why you need your own api_id
+
+Telegram issues `api_id`/`api_hash` per developer and rejects credentials that have been published: an app that ships a shared pair earns its users an [`API_ID_PUBLISHED_FLOOD`](https://core.telegram.org/api/obtaining_api_id) error at login. So this package deliberately does not ship one. It is a one-time, two-minute detour at [my.telegram.org/apps](https://my.telegram.org/apps), and it keeps the blast radius at one user instead of everyone at once.
+
+You do not have to put the values in a config file. Hand them to the agent and it calls `save_api_credentials`, which writes them next to the session at mode `0600`. `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` still work as environment variables and take precedence, which is the path for developers bringing their own app.
+
+**Only user-account mode needs this.** Bot API mode needs nothing but a [@BotFather](https://t.me/BotFather) token, which takes about thirty seconds inside Telegram. If you only want notifications or to post to a channel, use that.
+
 ## Security
 
 ### Bot token
@@ -103,6 +111,7 @@ The repo never contains real tokens, api hashes, or sessions. `mcp.json` only ha
 
 | Tool | Purpose |
 | --- | --- |
+| `save_api_credentials` | Store api_id / api_hash at 0600 so no config file is needed |
 | `auth_status` | Credentials + whether the session is authorized |
 | `start_login` / `complete_login` | Phone + login code (+ optional 2FA password) |
 | `start_qr_login` / `complete_qr_login` | QR / Link Desktop Device (+ optional 2FA) |
@@ -185,8 +194,8 @@ The plugin declares variables in `.cursor-plugin/plugin.json` and substitutes `$
 | Variable | Mode | Where to get it |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Bot | [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_API_ID` | User | [my.telegram.org/apps](https://my.telegram.org/apps) |
-| `TELEGRAM_API_HASH` | User | [my.telegram.org/apps](https://my.telegram.org/apps) |
+| `TELEGRAM_API_ID` | User | [my.telegram.org/apps](https://my.telegram.org/apps) — or let the agent store it, see below |
+| `TELEGRAM_API_HASH` | User | [my.telegram.org/apps](https://my.telegram.org/apps) — or let the agent store it, see below |
 | `TELEGRAM_SESSION` | User | Returned after first login (optional if the session file exists) |
 | `TELEGRAM_DISCLAIMER` | Both | Optional. Footer wording, or `off` to disable (see below) |
 

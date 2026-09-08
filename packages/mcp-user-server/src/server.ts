@@ -2,9 +2,11 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { createGramJsUserClient, qrUrl } from "./client.js";
 import {
+  apiCredentialsSource,
   getUserApiCredentials,
   readSessionString,
   sessionSource,
+  writeApiCredentials,
   writeSessionString,
 } from "./credentials.js";
 import {
@@ -209,6 +211,63 @@ export function createTelegramUserMcpServer(
   }
 
   server.registerTool(
+    "save_api_credentials",
+    {
+      title: "Save Telegram api_id and api_hash",
+      description:
+        "[User account] Store the api_id and api_hash the user obtained from https://my.telegram.org/apps, so they do not have to be set as environment variables. Written to a 0600 file next to the session. Telegram issues these per developer and rejects credentials that have been published, so this package cannot ship a shared pair — every user needs their own, once. Never echo api_hash back to the user.",
+      inputSchema: z.object({
+        api_id: z
+          .union([z.string().min(1), z.number()])
+          .describe("api_id from my.telegram.org/apps. A positive integer."),
+        api_hash: z
+          .string()
+          .min(1)
+          .describe("api_hash from the same page. Treat as a secret."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ api_id, api_hash }) => {
+      try {
+        const apiId = Number(String(api_id).trim());
+        if (!Number.isInteger(apiId) || apiId <= 0) {
+          return errorResult(
+            new Error(
+              "api_id must be a positive integer, as shown on my.telegram.org/apps.",
+            ),
+          );
+        }
+        const apiHash = api_hash.trim();
+        if (!/^[a-f0-9]{32}$/i.test(apiHash)) {
+          // A truncated or swapped paste otherwise fails much later, with an
+          // error that points nowhere near the actual mistake.
+          return errorResult(
+            new Error(
+              "api_hash does not look right: it is 32 hexadecimal characters on my.telegram.org/apps. Check that the whole value was copied, and that api_id and api_hash were not swapped.",
+            ),
+          );
+        }
+
+        const path = writeApiCredentials({ apiId, apiHash });
+        client = undefined;
+        return jsonResult({
+          ok: true,
+          saved_to: path,
+          api_id: apiId,
+          note: "Stored with mode 0600. api_hash is deliberately not echoed back. Next step: start_login with the user's phone number.",
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
     "auth_status",
     {
       title: "User-account auth status",
@@ -225,6 +284,7 @@ export function createTelegramUserMcpServer(
           return jsonResult({
             configured: false,
             authorized: false,
+            credentials_source: apiCredentialsSource(),
             session_source: sessionSource(),
             error: safeErrorMessage(err),
           });
@@ -234,6 +294,7 @@ export function createTelegramUserMcpServer(
         return jsonResult({
           configured: true,
           authorized,
+          credentials_source: apiCredentialsSource(),
           session_source: sessionSource(),
           me: authorized ? await active.getMe() : undefined,
           pending_phone_login: Boolean(pendingPhone),
