@@ -63,3 +63,11 @@ What each form does:
 - **a title** (`Holandija 2026`) — resolved against the dialog list. An exact title wins; an ambiguous one is refused with the candidates listed, and you must ask the user which they meant rather than picking one.
 
 A title that matches nothing fails immediately and says so. If you see that, call `list_dialogs`, confirm the chat with the user, and send to its id.
+
+## Groups with topics
+
+If `list_dialogs` marks a chat `isForum: true`, its messages live in separate threads. Call `list_forum_topics` and confirm the topic with the user before sending, then pass its id as `topic_id`.
+
+Do not guess a topic id and do not reuse one from an earlier conversation. Telegram does not reject a wrong id — it files the message under General, visible to the whole group. `send_message` verifies the id for you and refuses rather than sending, but the confirmation is still yours to get.
+
+Without `topic_id` the message goes to the chat itself, which in a forum means General.

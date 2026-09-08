@@ -97,6 +97,7 @@ describe("login across a process restart", () => {
       isAuthorized: async () => false,
       getMe: async () => me,
       listDialogs: async () => [],
+      listForumTopics: async () => [],
       getMessages: async () => [],
       sendMessage: async (chat: string, text: string) => ({
         id: 1,

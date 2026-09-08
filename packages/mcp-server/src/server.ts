@@ -5,7 +5,7 @@ import { applyDisclaimer, disclaimerText } from "./disclaimer.js";
 import { safeErrorMessage } from "./redact.js";
 import { getMe, getUpdates, sendMessage } from "./telegram.js";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 
 function jsonResult(value: unknown) {
   return {

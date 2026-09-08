@@ -79,6 +79,12 @@ You do not have to put the values in a config file. Hand them to the agent and i
 
 **Only user-account mode needs this.** Bot API mode needs nothing but a [@BotFather](https://t.me/BotFather) token, which takes about thirty seconds inside Telegram. If you only want notifications or to post to a channel, use that.
 
+## Forum topics
+
+Groups with topics turned on keep their messages in separate threads. `list_dialogs` marks those with `isForum`, `list_forum_topics` lists the threads, and `send_message` / `get_messages` take an optional `topic_id` to work inside one. Without `topic_id` nothing changes — the message goes to the chat as before.
+
+A wrong `topic_id` is worth understanding: Telegram does not reject it, it quietly files the message under General, in front of everyone. So `send_message` checks the id against the topic list before sending, and refuses a closed topic outright. That costs one extra call, only when a topic is named.
+
 ## Naming a chat
 
 `send_message` and `get_messages` take an id, `me`, an `@username`, or a chat title. Ids and `@usernames` go straight out. A title is resolved against your dialog list first, and an ambiguous one is refused with the candidates named rather than guessed at.
@@ -122,7 +128,8 @@ The repo never contains real tokens, api hashes, or sessions. `mcp.json` only ha
 | `start_login` / `complete_login` | Phone + login code (+ optional 2FA password) |
 | `start_qr_login` / `complete_qr_login` | QR / Link Desktop Device (+ optional 2FA) |
 | `get_me` | Logged-in **user** (not a bot) |
-| `list_dialogs` | Real dialog / inbox list |
+| `list_dialogs` | Real dialog / inbox list, `isForum` marks groups with topics |
+| `list_forum_topics` | Topics of a forum group, with the ids to send into |
 | `search_dialogs` | Filter dialogs by title, username, or id |
 | `get_messages` | Recent history for a chat |
 | `send_message` | Send text **as the user** (`me`, `@username`, dialog id, or a chat title) |

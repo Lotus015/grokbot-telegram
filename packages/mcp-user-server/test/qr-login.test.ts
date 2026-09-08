@@ -45,6 +45,7 @@ function qrClient(
     isAuthorized: async () => opts.authorized === true,
     getMe: async () => me,
     listDialogs: async () => [],
+    listForumTopics: async () => [],
     getMessages: async () => [],
     sendMessage: async (chat: string, text: string) => ({ id: 1, chatId: chat, text }),
     sendCode: async () => ({ phoneCodeHash: "h", isCodeViaApp: true }),

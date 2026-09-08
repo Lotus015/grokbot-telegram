@@ -1,4 +1,4 @@
-import type { DialogSummary } from "./dialogs.js";
+import type { DialogSummary, ForumTopicSummary } from "./dialogs.js";
 
 export type UserInfo = {
   id: string;
@@ -40,8 +40,17 @@ export type TelegramUserClient = {
   isAuthorized(): Promise<boolean>;
   getMe(): Promise<UserInfo>;
   listDialogs(limit: number): Promise<DialogSummary[]>;
-  getMessages(chat: string, limit: number): Promise<HistoryMessage[]>;
-  sendMessage(chat: string, text: string): Promise<SentMessage>;
+  listForumTopics(chat: string, limit: number): Promise<ForumTopicSummary[]>;
+  getMessages(
+    chat: string,
+    limit: number,
+    topicId?: number,
+  ): Promise<HistoryMessage[]>;
+  sendMessage(
+    chat: string,
+    text: string,
+    topicId?: number,
+  ): Promise<SentMessage>;
   sendCode(phone: string): Promise<SendCodeResult>;
   signIn(phone: string, phoneCodeHash: string, phoneCode: string): Promise<UserInfo>;
   signInWithPassword(password: string): Promise<UserInfo>;

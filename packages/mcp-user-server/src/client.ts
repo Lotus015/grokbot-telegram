@@ -4,7 +4,7 @@ import {
   getUserApiCredentials,
   readSessionString,
 } from "./credentials.js";
-import type { DialogSummary } from "./dialogs.js";
+import type { DialogSummary, ForumTopicSummary } from "./dialogs.js";
 import {
   isPasswordNeeded,
   resolveChatTarget,
@@ -15,7 +15,7 @@ import {
   type UserInfo,
 } from "./types.js";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object"
@@ -46,7 +46,7 @@ function mapDialog(dialog: {
   isUser?: boolean;
   isGroup?: boolean;
   isChannel?: boolean;
-  entity?: { username?: string };
+  entity?: { username?: string; forum?: boolean };
 }): DialogSummary {
   let type: DialogSummary["type"] = "unknown";
   if (dialog.isUser) type = "user";
@@ -59,6 +59,23 @@ function mapDialog(dialog: {
     type,
     username,
     unreadCount: dialog.unreadCount,
+    ...(dialog.entity?.forum === true ? { isForum: true } : {}),
+  };
+}
+
+function mapForumTopic(topic: unknown): ForumTopicSummary | null {
+  const t = asRecord(topic);
+  // The list also carries tombstones for deleted topics; they have no title
+  // and nothing can be sent to them.
+  if (t === undefined || typeof t.id !== "number" || typeof t.title !== "string") {
+    return null;
+  }
+  return {
+    id: t.id,
+    title: t.title,
+    ...(typeof t.unreadCount === "number" ? { unreadCount: t.unreadCount } : {}),
+    ...(t.closed === true ? { closed: true } : {}),
+    ...(t.pinned === true ? { pinned: true } : {}),
   };
 }
 
@@ -148,17 +165,39 @@ export function createGramJsUserClient(
         mapDialog(dialog as unknown as Parameters<typeof mapDialog>[0]),
       );
     },
-    async getMessages(chat: string, limit: number) {
+    async listForumTopics(chat: string, limit: number) {
+      await adapter.connect();
+      const result = await client.invoke(
+        new Api.messages.GetForumTopics({
+          peer: resolveChatTarget(chat),
+          offsetDate: 0,
+          offsetId: 0,
+          offsetTopic: 0,
+          limit,
+        }),
+      );
+      const topics = asRecord(result)?.topics;
+      if (!Array.isArray(topics)) return [];
+      return topics
+        .map((topic) => mapForumTopic(topic))
+        .filter((topic): topic is ForumTopicSummary => topic !== null);
+    },
+    async getMessages(chat: string, limit: number, topicId?: number) {
       await adapter.connect();
       const messages = await client.getMessages(resolveChatTarget(chat), {
         limit,
+        // In a forum, the thread is addressed by the message that opens it.
+        ...(topicId === undefined ? {} : { replyTo: topicId }),
       });
       return messages.map((msg) => mapMessage(msg));
     },
-    async sendMessage(chat: string, text: string) {
+    async sendMessage(chat: string, text: string, topicId?: number) {
       await adapter.connect();
       const target = resolveChatTarget(chat);
-      const sent = await client.sendMessage(target, { message: text });
+      const sent = await client.sendMessage(target, {
+        message: text,
+        ...(topicId === undefined ? {} : { topMsgId: topicId }),
+      });
       return {
         id: Number(sent.id ?? 0),
         chatId: sent.chatId != null ? String(sent.chatId) : target,

@@ -96,6 +96,7 @@ describe("save_api_credentials tool", () => {
     isAuthorized: async () => false,
     getMe: async () => ({ id: "1", isBot: false }),
     listDialogs: async () => [],
+    listForumTopics: async () => [],
     getMessages: async () => [],
     sendMessage: async (chat: string, text: string) => ({ id: 1, chatId: chat, text }),
     sendCode: async () => ({ phoneCodeHash: "h", isCodeViaApp: true }),

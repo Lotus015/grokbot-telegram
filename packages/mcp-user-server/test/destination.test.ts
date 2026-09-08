@@ -132,6 +132,7 @@ describe("send_message destination handling", () => {
           { id: "-5532867099", title: "Holandija 2026", type: "group" as const },
         ];
       },
+      listForumTopics: async () => [],
       getMessages: async () => [],
       sendMessage: async (chat: string, text: string) => {
         seen.targets.push(chat);
@@ -238,6 +239,7 @@ describe("get_messages destination handling", () => {
             { id: "-5532867099", title: "Holandija 2026", type: "group" as const },
           ];
         },
+        listForumTopics: async () => [],
         getMessages: async (chat: string) => {
           seen.targets.push(chat);
           return [{ id: 1, text: "hi" }];

@@ -30,7 +30,7 @@ import {
   type TelegramUserClient,
 } from "./types.js";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 
 const SESSION_WARNING =
   "This session string is full access to the personal Telegram account. Save it in Plugins → Configure as TELEGRAM_SESSION (or keep the session file). Never commit it. Treat it like a password.";
@@ -176,6 +176,45 @@ export function createTelegramUserMcpServer(
     }
     if (destination.usernameFallback) return { target: destination.title };
     throw noSuchChatError(destination.title);
+  }
+
+  const TOPIC_LOOKUP_LIMIT = 100;
+
+  // Sending with a stale or wrong topic id does not error: Telegram quietly
+  // files the message under General, in front of everyone in the group. So the
+  // id is verified against the topic list first, the same way an ambiguous
+  // chat title is refused rather than guessed at.
+  async function verifyTopic(
+    active: TelegramUserClient,
+    target: string,
+    topicId: number,
+  ): Promise<{ id: number; title: string }> {
+    let topics;
+    try {
+      topics = await active.listForumTopics(target, TOPIC_LOOKUP_LIMIT);
+    } catch (err) {
+      throw new Error(
+        `Could not read the topic list for this chat, so the topic could not be verified: ${safeErrorMessage(err)}. If this chat is not a forum, omit topic_id.`,
+      );
+    }
+    const match = topics.find((topic) => topic.id === topicId);
+    if (match === undefined) {
+      const shown = topics
+        .slice(0, 8)
+        .map((topic) => `${topic.title} (${topic.id})`)
+        .join("; ");
+      throw new Error(
+        topics.length === 0
+          ? `No topics in this chat — it is not a forum, or it has none. Omit topic_id to send to the chat itself.`
+          : `No topic with id ${topicId} in this chat. Call list_forum_topics and use an id from it. Available: ${shown}`,
+      );
+    }
+    if (match.closed === true) {
+      throw new Error(
+        `Topic ${JSON.stringify(match.title)} (${topicId}) is closed, so a message would not appear in it.`,
+      );
+    }
+    return { id: match.id, title: match.title };
   }
 
   async function loginResult(payload: Record<string, unknown>) {
@@ -668,6 +707,52 @@ export function createTelegramUserMcpServer(
   );
 
   server.registerTool(
+    "list_forum_topics",
+    {
+      title: "List forum topics",
+      description:
+        "[User account] List the topics of a group that has topics turned on. Returns each topic's id and title; that id is what send_message and get_messages take as topic_id. list_dialogs marks such groups with isForum. Call this before sending into a topic — a wrong id is not an error, the message simply lands in General.",
+      inputSchema: z.object({
+        chat: z
+          .string()
+          .min(1)
+          .describe("The forum group: dialog id, @username, or title."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Max topics to return (1–100). Default 100."),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ chat, limit }) => {
+      try {
+        const active = await getClient();
+        const { target, resolved } = await resolveDestination(active, chat);
+        const topics = await active.listForumTopics(
+          target,
+          limit ?? TOPIC_LOOKUP_LIMIT,
+        );
+        return jsonResult({
+          chat,
+          topics,
+          count: topics.length,
+          ...(topics.length === 0
+            ? {
+                note: "No topics. Either this group does not have topics turned on, or it has none. Send to the chat itself without topic_id.",
+              }
+            : {}),
+          ...(resolved === undefined ? {} : { resolved_chat: resolved }),
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
     "get_messages",
     {
       title: "Get recent messages",
@@ -685,18 +770,27 @@ export function createTelegramUserMcpServer(
           .max(100)
           .optional()
           .describe("Max messages (1–100). Default 20."),
+        topic_id: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Read one forum topic instead of the whole chat. Get the id from list_forum_topics.",
+          ),
       }),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ chat, limit }) => {
+    async ({ chat, limit, topic_id }) => {
       try {
         const active = await getClient();
         const { target, resolved } = await resolveDestination(active, chat);
-        const messages = await active.getMessages(target, limit ?? 20);
+        const messages = await active.getMessages(target, limit ?? 20, topic_id);
         return jsonResult({
           chat,
           messages,
           count: messages.length,
+          ...(topic_id === undefined ? {} : { topic_id }),
           ...(resolved === undefined ? {} : { resolved_chat: resolved }),
         });
       } catch (err) {
@@ -717,6 +811,14 @@ export function createTelegramUserMcpServer(
           .min(1)
           .describe("Destination: me, @username, or a dialog id from list_dialogs."),
         text: z.string().min(1).max(4096).describe("Message text to send."),
+        topic_id: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Send into a forum topic instead of the chat itself. Get the id from list_forum_topics; it is verified before sending, because a wrong one would land in General.",
+          ),
       }),
       annotations: {
         readOnlyHint: false,
@@ -725,7 +827,7 @@ export function createTelegramUserMcpServer(
         openWorldHint: true,
       },
     },
-    async ({ chat, text }) => {
+    async ({ chat, text, topic_id }) => {
       try {
         const active = await getClient();
         if (!(await active.isAuthorized())) {
@@ -734,12 +836,17 @@ export function createTelegramUserMcpServer(
           );
         }
         const { target, resolved } = await resolveDestination(active, chat);
+        const topic =
+          topic_id === undefined
+            ? undefined
+            : await verifyTopic(active, target, topic_id);
         const sentText = applyDisclaimer(text);
-        const result = await active.sendMessage(target, sentText);
+        const result = await active.sendMessage(target, sentText, topic_id);
         return jsonResult({
           ...result,
           identity: "user-account",
           disclaimer: disclaimerText(),
+          ...(topic === undefined ? {} : { topic }),
           ...(resolved === undefined ? {} : { resolved_chat: resolved }),
         });
       } catch (err) {

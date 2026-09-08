@@ -26,6 +26,7 @@ function mockClient(overrides: Partial<TelegramUserClient> = {}): TelegramUserCl
     isAuthorized: async () => true,
     getMe: async () => me,
     listDialogs: async () => dialogs,
+    listForumTopics: async () => [],
     getMessages: async (chat) => [
       { id: 1, text: `hello ${chat}`, out: false, senderId: "7" },
     ],
@@ -70,6 +71,7 @@ const expectedTools = [
   "get_me",
   "get_messages",
   "list_dialogs",
+  "list_forum_topics",
   "save_api_credentials",
   "search_dialogs",
   "send_message",

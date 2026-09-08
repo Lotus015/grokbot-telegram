@@ -1,6 +1,6 @@
 {
   "name": "grokbot-telegram",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Telegram MCP servers in one command: Bot API (send as your @bot) and MTProto user account (send as you).",
   "license": "MIT",
   "type": "module",
